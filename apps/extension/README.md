@@ -20,7 +20,7 @@ npm run dev
 npm run build
 ```
 
-The companion control is wired to the extension runtime. The DOM semantic layer scans accessible interactive candidates, infers bounded labels and section context, tracks visibility separately from viewport position, and exposes a debounced `MutationObserver` scanner. Session state, action observation, reasoning, guidance, voice, safety, flow orchestration, and runtime composition are covered by their respective feature boundaries.
+The companion control is wired to the extension runtime and exposes accessible state, retry, and follow-up semantics. The DOM semantic layer scans accessible interactive candidates, infers bounded labels and section context, tracks visibility separately from viewport position, and exposes a debounced `MutationObserver` scanner. Session state, action observation, reasoning, guidance, voice, safety, flow orchestration, runtime composition, and accessibility are covered by their respective feature boundaries.
 
 ## Responsibilities
 
