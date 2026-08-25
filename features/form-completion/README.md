@@ -9,9 +9,11 @@ non-invalid value.
 
 `apps/extension/interaction/interaction-observer.ts` reads the control's safe
 `hasValue` and `validationState` metadata before matching a pending `input` or
-`select` action. Empty or invalid controls emit semantic status but keep the
-pending workflow; a value with no invalid marker allows the user action to
-match. Raw values are never included in events or reasoning requests.
+`select` action. Text input is settled through a cancellable debounce and
+`change` events flush it immediately. Empty or invalid controls emit semantic
+status but keep the pending workflow; a value with no invalid marker allows
+the user action to match. Raw values are never included in events or reasoning
+requests.
 
 Run the focused tests from `apps/extension/` with:
 

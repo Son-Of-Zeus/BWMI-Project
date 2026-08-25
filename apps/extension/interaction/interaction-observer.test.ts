@@ -143,6 +143,7 @@ describe('interaction observer', () => {
       session,
       onEvent: (event) => events.push(event),
       now: () => 30,
+      inputCompletionDebounceMs: 0,
     });
     observer.start();
 
@@ -187,6 +188,7 @@ describe('interaction observer', () => {
       session,
       onEvent: (event) => events.push(event),
       now: () => 35,
+      inputCompletionDebounceMs: 0,
     });
     observer.start();
 
@@ -217,6 +219,60 @@ describe('interaction observer', () => {
     expect(session.getState().pendingAction).toBeUndefined();
     expect(JSON.stringify(events)).not.toContain('"value"');
     observer.stop();
+  });
+
+  it('coalesces keystrokes before reporting input completion', () => {
+    vi.useFakeTimers();
+    try {
+      const input = document.createElement('input');
+      input.type = 'text';
+      document.body.append(input);
+
+      const registry = createElementRegistry();
+      registry.reconcile([
+        discovered(input, 'UAN', { role: 'textbox', hasValue: false }),
+      ]);
+      const session = createSessionState();
+      session.setPendingAction({
+        targetId: 'el_1',
+        expectedUserAction: 'input',
+      });
+      const events: unknown[] = [];
+      const observer = createInteractionObserver({
+        registry,
+        session,
+        onEvent: (event) => events.push(event),
+        now: () => 45,
+        inputCompletionDebounceMs: 100,
+      });
+      observer.start();
+
+      input.value = '1';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      vi.advanceTimersByTime(80);
+      input.value = '12';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+
+      expect(events).toHaveLength(0);
+      vi.advanceTimersByTime(99);
+      expect(events).toHaveLength(0);
+      vi.advanceTimersByTime(1);
+
+      expect(events).toEqual([
+        expect.objectContaining({
+          type: 'input-complete',
+          matchedPending: true,
+          hasValue: true,
+          validationState: 'valid',
+          timestamp: 45,
+        }),
+      ]);
+      expect(session.getState().pendingAction).toBeUndefined();
+      expect(JSON.stringify(events)).not.toContain('"value"');
+      observer.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('reports select changes using the select action type', () => {

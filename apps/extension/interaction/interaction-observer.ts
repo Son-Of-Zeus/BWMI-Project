@@ -55,12 +55,15 @@ export type InteractionEvent =
   | SelectInteractionEvent
   | NavigationEvent;
 
+export const DEFAULT_INPUT_COMPLETION_DEBOUNCE_MS = 250;
+
 export type InteractionObserverOptions = {
   document?: Document;
   registry: ElementRegistry;
   session: SessionStateStore;
   onEvent?: (event: InteractionEvent) => void;
   now?: () => number;
+  inputCompletionDebounceMs?: number;
 };
 
 export type InteractionObserver = {
@@ -154,6 +157,17 @@ export function createInteractionObserver(
   const windowNode = documentNode.defaultView;
   const listeners = new Set<(event: InteractionEvent) => void>();
   const now = options.now ?? Date.now;
+  const inputCompletionDebounceMs = Math.max(
+    0,
+    Math.floor(
+      options.inputCompletionDebounceMs ??
+        DEFAULT_INPUT_COMPLETION_DEBOUNCE_MS,
+    ),
+  );
+  const pendingInputTimers = new Map<
+    HTMLElement,
+    ReturnType<typeof setTimeout>
+  >();
   let started = false;
   let currentUrl = getCurrentUrl(documentNode);
   let historyNode: History | undefined;
@@ -166,11 +180,14 @@ export function createInteractionObserver(
   };
 
   const recordTargetedAction = (
-    event: Event,
+    event: Event | undefined,
     action: ObservedAction,
+    entryOverride?: RegistryEntry,
   ) => {
-    const entry = findRegisteredEntry(event, options.registry);
-    if (!entry) {
+    const entry =
+      entryOverride ??
+      (event ? findRegisteredEntry(event, options.registry) : undefined);
+    if (!entry || !entry.element.isConnected) {
       return;
     }
 
@@ -226,7 +243,22 @@ export function createInteractionObserver(
     if (!entry || !isInputLike(entry.element) || isSelectLike(entry.element)) {
       return;
     }
-    recordTargetedAction(event, 'input');
+
+    const previousTimer = pendingInputTimers.get(entry.element);
+    if (previousTimer) {
+      clearTimeout(previousTimer);
+    }
+
+    if (inputCompletionDebounceMs === 0) {
+      recordTargetedAction(event, 'input', entry);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      pendingInputTimers.delete(entry.element);
+      recordTargetedAction(undefined, 'input', entry);
+    }, inputCompletionDebounceMs);
+    pendingInputTimers.set(entry.element, timer);
   };
 
   const handleChange = (event: Event) => {
@@ -234,7 +266,16 @@ export function createInteractionObserver(
     if (!entry || !isInputLike(entry.element)) {
       return;
     }
-    recordTargetedAction(event, isSelectLike(entry.element) ? 'select' : 'input');
+    const pendingTimer = pendingInputTimers.get(entry.element);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      pendingInputTimers.delete(entry.element);
+    }
+    recordTargetedAction(
+      event,
+      isSelectLike(entry.element) ? 'select' : 'input',
+      entry,
+    );
   };
 
   const emitNavigation = (reason: NavigationReason) => {
@@ -320,6 +361,8 @@ export function createInteractionObserver(
       historyNode = undefined;
       originalPushState = undefined;
       originalReplaceState = undefined;
+      pendingInputTimers.forEach((timer) => clearTimeout(timer));
+      pendingInputTimers.clear();
     },
 
     subscribe(listener) {

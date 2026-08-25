@@ -62,8 +62,10 @@ Emit high-level status instead:
 ```
 
 An expected `input` or `select` action is matched only when the control has a
-value and is not marked invalid. Empty or invalid controls remain pending;
-their values never leave the page.
+value and is not marked invalid. Text-input events are coalesced before an
+`input-complete` event is emitted, while a `change` event flushes completion
+immediately. Empty or invalid controls remain pending; their values never
+leave the page.
 
 ## Matching Pending Actions
 
