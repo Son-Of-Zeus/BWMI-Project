@@ -207,12 +207,32 @@ export function createPrototypeReasoner() {
           return guideTarget(claimForm, language);
         }
 
+        const continueTarget = findTarget(
+          request.page.elements,
+          /\bcontinue(?: to review)?\b/i,
+          CLICK_ROLES,
+        );
+        if (continueTarget) {
+          return guideTarget(continueTarget, language);
+        }
+
         const uanInput = findTarget(
           request.page.elements,
           /\buan\b/i,
           new Set(['textbox']),
         );
-        if (uanInput && uanInput.hasValue !== true) {
+        const verifyControl = request.page.elements.find(
+          (element) =>
+            element.visible &&
+            /\bverify\b/i.test(element.label) &&
+            CLICK_ROLES.has(element.role),
+        );
+        if (
+          uanInput &&
+          (uanInput.hasValue !== true ||
+            uanInput.validationState === 'invalid' ||
+            verifyControl?.disabled === true)
+        ) {
           return guideTarget(uanInput, language);
         }
 
@@ -223,15 +243,6 @@ export function createPrototypeReasoner() {
         );
         if (verifyTarget) {
           return guideTarget(verifyTarget, language);
-        }
-
-        const continueTarget = findTarget(
-          request.page.elements,
-          /\bcontinue(?: to review)?\b/i,
-          CLICK_ROLES,
-        );
-        if (continueTarget) {
-          return guideTarget(continueTarget, language);
         }
 
         const confirmationTarget = findTarget(

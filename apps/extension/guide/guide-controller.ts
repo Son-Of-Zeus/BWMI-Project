@@ -194,7 +194,9 @@ export function createGuideController(
     };
 
     const handleResize = () => refresh();
+    const handleScroll = () => refresh();
     windowNode?.addEventListener('resize', handleResize);
+    windowNode?.addEventListener('scroll', handleScroll, true);
 
     const observer =
       typeof MutationObserver === 'undefined'
@@ -208,6 +210,7 @@ export function createGuideController(
 
     return () => {
       windowNode?.removeEventListener('resize', handleResize);
+      windowNode?.removeEventListener('scroll', handleScroll, true);
       observer?.disconnect();
     };
   };

@@ -39,7 +39,8 @@ export type NavigationReason =
   | 'push-state'
   | 'replace-state'
   | 'popstate'
-  | 'hashchange';
+  | 'hashchange'
+  | 'url-poll';
 
 export type NavigationEvent = {
   type: 'navigation';
@@ -56,6 +57,7 @@ export type InteractionEvent =
   | NavigationEvent;
 
 export const DEFAULT_INPUT_COMPLETION_DEBOUNCE_MS = 250;
+export const DEFAULT_NAVIGATION_POLL_MS = 250;
 
 export type InteractionObserverOptions = {
   document?: Document;
@@ -64,6 +66,7 @@ export type InteractionObserverOptions = {
   onEvent?: (event: InteractionEvent) => void;
   now?: () => number;
   inputCompletionDebounceMs?: number;
+  navigationPollMs?: number;
 };
 
 export type InteractionObserver = {
@@ -164,6 +167,10 @@ export function createInteractionObserver(
         DEFAULT_INPUT_COMPLETION_DEBOUNCE_MS,
     ),
   );
+  const navigationPollMs = Math.max(
+    25,
+    Math.floor(options.navigationPollMs ?? DEFAULT_NAVIGATION_POLL_MS),
+  );
   const pendingInputTimers = new Map<
     HTMLElement,
     ReturnType<typeof setTimeout>
@@ -173,6 +180,7 @@ export function createInteractionObserver(
   let historyNode: History | undefined;
   let originalPushState: History['pushState'] | undefined;
   let originalReplaceState: History['replaceState'] | undefined;
+  let navigationTimer: ReturnType<typeof setInterval> | undefined;
 
   const emit = (event: InteractionEvent) => {
     options.onEvent?.(event);
@@ -298,6 +306,7 @@ export function createInteractionObserver(
 
   const handlePopState = () => emitNavigation('popstate');
   const handleHashChange = () => emitNavigation('hashchange');
+  const pollNavigation = () => emitNavigation('url-poll');
 
   return {
     start() {
@@ -314,7 +323,7 @@ export function createInteractionObserver(
       windowNode?.addEventListener('hashchange', handleHashChange);
 
       historyNode = windowNode?.history;
-      if (!historyNode) {
+      if (!historyNode || !windowNode) {
         return;
       }
 
@@ -336,6 +345,11 @@ export function createInteractionObserver(
         emitNavigation('replace-state');
         return result;
       };
+
+      navigationTimer = windowNode.setInterval(
+        pollNavigation,
+        navigationPollMs,
+      );
     },
 
     stop() {
@@ -357,6 +371,10 @@ export function createInteractionObserver(
         if (originalReplaceState) {
           historyNode.replaceState = originalReplaceState;
         }
+      }
+      if (navigationTimer !== undefined) {
+        windowNode?.clearInterval(navigationTimer);
+        navigationTimer = undefined;
       }
       historyNode = undefined;
       originalPushState = undefined;

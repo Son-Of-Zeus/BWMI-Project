@@ -348,6 +348,27 @@ describe('guide controller', () => {
     );
   });
 
+  it('remeasures the target while smooth scrolling settles', async () => {
+    const harness = createHarness();
+    await harness.controller.run({
+      action: 'guide',
+      targetId: 'el_1',
+      spokenInstruction: 'Target par click kariye.',
+      expectedUserAction: 'click',
+      language: 'hi-IN',
+    });
+
+    harness.setRect(rect(420, 460));
+    window.dispatchEvent(new Event('scroll'));
+
+    expect(harness.overlay.highlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: 420, bottom: 460 }),
+    );
+    expect(harness.companion.setTarget).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: 420, bottom: 460 }),
+    );
+  });
+
   it('preserves pending workflow context for explanation actions', async () => {
     const harness = createHarness();
     harness.session.setPendingAction({

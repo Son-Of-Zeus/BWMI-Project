@@ -208,6 +208,51 @@ test('prototype reasoner chooses Online Services for a PF withdrawal request', a
   });
 });
 
+test('prototype reasoner returns to a blocked UAN instead of global navigation', async () => {
+  const request = validateReasonRequest({
+    userUtterance: 'Mujhe PF ka paisa nikalna hai.',
+    userLanguage: 'hi-IN',
+    session: { recentActions: [{ type: 'click', label: 'Online Services' }] },
+    page: {
+      title: 'Submit a PF claim',
+      section: 'Member verification',
+      elements: [
+        {
+          id: 'el_uan',
+          role: 'textbox',
+          label: 'Universal Account Number (UAN)',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+          hasValue: true,
+          validationState: 'valid',
+        },
+        {
+          id: 'el_verify',
+          role: 'button',
+          label: 'Verify',
+          visible: true,
+          inViewport: true,
+          disabled: true,
+        },
+        {
+          id: 'el_online_services',
+          role: 'button',
+          label: 'Online Services',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+    },
+  });
+
+  const action = await createPrototypeReasoner().reason(request);
+  assert.equal(action.action, 'guide');
+  assert.equal(action.targetId, 'el_uan');
+  assert.equal(action.expectedUserAction, 'input');
+});
+
 test('prototype reasoner advances through the fictional claim journey', async () => {
   const reasoner = createPrototypeReasoner();
   const utterance = 'Mujhe PF ka paisa nikalna hai.';
@@ -294,6 +339,14 @@ test('prototype reasoner advances through the fictional claim journey', async ()
     {
       recentActions: [{ type: 'click', label: 'Verify' }],
       elements: [
+        {
+          id: 'el_verify',
+          role: 'button',
+          label: 'Verify',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
         {
           id: 'el_continue',
           role: 'button',

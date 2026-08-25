@@ -350,4 +350,47 @@ describe('interaction observer', () => {
     window.history.pushState({}, '', '/after-stop');
     expect(events).toHaveLength(1);
   });
+
+  it('detects URL changes made by page-world history APIs', () => {
+    vi.useFakeTimers();
+    try {
+      const button = document.createElement('button');
+      document.body.append(button);
+      const registry = createElementRegistry();
+      registry.reconcile([discovered(button, 'Target')]);
+      const session = createSessionState();
+      session.setPendingAction({
+        targetId: 'el_1',
+        expectedUserAction: 'click',
+      });
+      const events: unknown[] = [];
+      const observer = createInteractionObserver({
+        registry,
+        session,
+        onEvent: (event) => events.push(event),
+        now: () => 60,
+        navigationPollMs: 25,
+      });
+      const pageWorldPushState = window.history.pushState;
+      observer.start();
+
+      pageWorldPushState.call(window.history, {}, '', '/review');
+      vi.advanceTimersByTime(25);
+
+      expect(events).toEqual([
+        {
+          type: 'navigation',
+          url: expect.stringContaining('/review'),
+          previousUrl: expect.stringContaining('/'),
+          reason: 'url-poll',
+          timestamp: 60,
+        },
+      ]);
+      expect(session.getState().pendingAction).toBeUndefined();
+
+      observer.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
