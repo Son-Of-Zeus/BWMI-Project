@@ -14,7 +14,7 @@ The extension must guide the user without taking control of consequential action
 
 ## Project Status
 
-The mock portal is complete and should be treated as a read-only integration target. Ongoing development is limited to the Chrome extension and its supporting feature modules; do not add portal functionality or extension-specific hooks to the site.
+The mock portal is complete and should be treated as a read-only integration target. The core extension mechanics and a prototype backend boundary are implemented; ongoing development must stay within the Chrome extension, backend, and supporting feature modules. Do not add portal functionality or extension-specific hooks to the site.
 
 ---
 
@@ -43,7 +43,14 @@ project/
 │       └── README.md
 │
 ├── backend/
-│   └── README.md
+│   ├── README.md
+│   ├── package.json
+│   ├── src/
+│   │   ├── contracts.js
+│   │   ├── prototype-adapters.js
+│   │   └── server.js
+│   └── test/
+│       └── server.test.js
 │
 └── features/
     ├── dom-semantic-layer/
@@ -89,6 +96,8 @@ project/
     ├── form-completion/
     │   └── README.md
     ├── consequence-guidance/
+    │   └── README.md
+    ├── backend-api/
     │   └── README.md
     └── input-settling/
         └── README.md

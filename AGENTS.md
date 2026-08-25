@@ -23,6 +23,13 @@ npm test                            # run Vitest tests once
 npm run build                       # build the Chrome MV3 extension
 ```
 
+Run backend commands from `backend/`:
+
+```sh
+npm test                            # run backend contract and HTTP tests
+npm start                           # start the prototype API on localhost
+```
+
 Use `rg --files` to inventory files and `git diff --check` for whitespace validation. Do not add commands or changes for the completed mock portal.
 
 ## Coding Style & Naming Conventions
