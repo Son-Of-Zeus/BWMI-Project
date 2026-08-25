@@ -6,6 +6,16 @@ Translate a validated `GuideAction` into physical guidance on the webpage.
 
 The guide controller decides **how** guidance is shown.
 
+## Current Implementation
+
+The extension implementation lives in `apps/extension/guide/guide-controller.ts`. It resolves live registry targets, scrolls with reduced-motion support, remeasures after layout changes, drives injected overlay/companion/speech adapters, preserves pending context for explanations, and exposes cancellation without any automatic click capability.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npx vitest run guide/guide-controller.test.ts
+```
+
 ## Responsibilities
 
 For a `guide` action:
