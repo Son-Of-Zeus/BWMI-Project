@@ -346,6 +346,17 @@ function getValidationState(
   return hasValue === undefined ? undefined : 'unknown';
 }
 
+export function readSafeControlState(element: HTMLElement): {
+  hasValue?: boolean;
+  validationState?: ValidationState;
+} {
+  const hasValue = getHasValue(element);
+  return {
+    hasValue,
+    validationState: getValidationState(element, hasValue),
+  };
+}
+
 function isDisabled(element: HTMLElement): boolean {
   return (
     element.getAttribute('aria-disabled') === 'true' ||
@@ -361,7 +372,7 @@ export function discoverSemanticElements(
     .filter((element) => isVisible(element))
     .map((element) => {
       const role = inferRole(element);
-      const hasValue = getHasValue(element);
+      const controlState = readSafeControlState(element);
 
       return {
         role,
@@ -370,8 +381,8 @@ export function discoverSemanticElements(
         visible: true,
         inViewport: isInViewport(element, options.viewport),
         disabled: isDisabled(element),
-        hasValue,
-        validationState: getValidationState(element, hasValue),
+        hasValue: controlState.hasValue,
+        validationState: controlState.validationState,
         element,
       } satisfies DiscoveredElement;
     });

@@ -6,6 +6,16 @@ Detect when the user performs the action the companion is waiting for.
 
 The assistant guides; the user acts.
 
+## Current Implementation
+
+The extension implementation lives in `apps/extension/interaction/interaction-observer.ts`. It resolves nested event targets through the element registry, matches actions against pending session state, records only semantic action metadata, reports high-level input/select status without values, observes SPA history/navigation, and never prevents the website's own events.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npx vitest run interaction/interaction-observer.test.ts
+```
+
 ## Click Observation
 
 Listen at the document level in capture phase:
