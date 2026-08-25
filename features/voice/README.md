@@ -32,6 +32,26 @@ interface TextToSpeech {
 
 The rest of the extension should depend on these interfaces rather than Sarvam-specific response types.
 
+## Current Extension Implementation
+
+`apps/extension/voice/voice.ts` provides the provider-neutral controller and
+adapters. The controller owns `listening`, `transcribing`, `thinking`, and
+speech states, cancels stale recordings or playback, and forwards detected
+language to text-to-speech. The shared companion state has no separate
+`transcribing` value, so that state is presented as `thinking` at the UI
+boundary.
+
+`createSpeechApiClient` calls only `/speech/transcribe` and
+`/speech/synthesize`; provider credentials never enter the extension bundle.
+Development transcripts, a browser `MediaRecorder` adapter, and browser audio
+playback are available for deterministic integration work. Run the focused
+tests with:
+
+```sh
+cd apps/extension
+npm test -- --run voice/voice.test.ts
+```
+
 ## Provider
 
 Sarvam AI is the intended provider for:

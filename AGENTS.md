@@ -39,4 +39,4 @@ The completed portal must remain free of extension hooks or assistant metadata. 
 
 ## Commit & Pull Request Guidelines
 
-This checkout has no Git history, so no existing convention can be inferred. Use short imperative subjects with a scoped prefix, such as `docs: clarify registry contract` or `feat: add semantic scanner`. Pull requests should explain the affected boundary, list validation results, link an issue when available, include UI screenshots/recordings, and call out safety, data-handling, or API-contract changes.
+Use short imperative subjects with a scoped prefix, matching the existing history (for example, `feat(extension): add voice layer` or `docs: clarify registry contract`). Pull requests should explain the affected boundary, list validation results, link an issue when available, include UI screenshots/recordings, and call out safety, data-handling, or API-contract changes. The mock portal is complete; do not include portal feature work in commits or pull requests.
