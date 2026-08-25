@@ -4,7 +4,10 @@ import { after, before, describe, test } from 'node:test';
 import {
   validateReasonRequest,
 } from '../src/contracts.js';
-import { createPrototypeReasoner } from '../src/prototype-adapters.js';
+import {
+  createPrototypeReasoner,
+  createPrototypeTranscriber,
+} from '../src/prototype-adapters.js';
 import { createBackendServer } from '../src/server.js';
 
 const allowedOrigin = 'chrome-extension://prototype';
@@ -208,6 +211,19 @@ test('prototype reasoner chooses Online Services for a PF withdrawal request', a
   });
 });
 
+test('prototype transcriber supplies a completion phrase on the next voice turn', async () => {
+  const transcriber = createPrototypeTranscriber();
+
+  assert.deepEqual(await transcriber.transcribe(), {
+    transcript: 'Mujhe PF ka paisa nikalna hai.',
+    language: 'hi-IN',
+  });
+  assert.deepEqual(await transcriber.transcribe(), {
+    transcript: "I'm done.",
+    language: 'en-IN',
+  });
+});
+
 test('prototype reasoner returns to a blocked UAN instead of global navigation', async () => {
   const request = validateReasonRequest({
     userUtterance: 'Mujhe PF ka paisa nikalna hai.',
@@ -251,6 +267,57 @@ test('prototype reasoner returns to a blocked UAN instead of global navigation',
   assert.equal(action.action, 'guide');
   assert.equal(action.targetId, 'el_uan');
   assert.equal(action.expectedUserAction, 'input');
+});
+
+test('prototype reasoner waits for explicit input completion before advancing', async () => {
+  const baseRequest = {
+    userLanguage: 'en-IN',
+    session: {
+      pendingAction: { type: 'input', targetLabel: 'Universal Account Number (UAN)' },
+      recentActions: [{ type: 'input', label: 'Universal Account Number (UAN)' }],
+    },
+    page: {
+      title: 'Submit a PF claim',
+      section: 'Member verification',
+      elements: [
+        {
+          id: 'el_uan',
+          role: 'textbox',
+          label: 'Universal Account Number (UAN)',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+          hasValue: true,
+          validationState: 'valid',
+        },
+        {
+          id: 'el_verify',
+          role: 'button',
+          label: 'Verify',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+    },
+  };
+
+  const waitingAction = await createPrototypeReasoner().reason(
+    validateReasonRequest({
+      ...baseRequest,
+      userUtterance: 'I am still typing.',
+    }),
+  );
+  assert.deepEqual(waitingAction, { action: 'wait' });
+
+  const completedAction = await createPrototypeReasoner().reason(
+    validateReasonRequest({
+      ...baseRequest,
+      userUtterance: "I'm done.",
+    }),
+  );
+  assert.equal(completedAction.action, 'guide');
+  assert.equal(completedAction.targetId, 'el_verify');
 });
 
 test('prototype reasoner advances through the fictional claim journey', async () => {
@@ -362,6 +429,14 @@ test('prototype reasoner advances through the fictional claim journey', async ()
     {
       recentActions: [{ type: 'click', label: 'Continue to review' }],
       elements: [
+        {
+          id: 'el_online_services_review',
+          role: 'button',
+          label: 'Online Services',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
         {
           id: 'el_confirm',
           role: 'checkbox',

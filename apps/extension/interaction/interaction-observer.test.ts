@@ -155,19 +155,23 @@ describe('interaction observer', () => {
       action: 'input',
       targetId: 'el_1',
       label: 'Password',
-      matchedPending: true,
+      matchedPending: false,
       hasValue: true,
       validationState: 'valid',
       timestamp: 30,
     });
     expect(JSON.stringify(event)).not.toContain('secret-value');
+    expect(session.getState().pendingAction).toEqual({
+      targetId: 'el_1',
+      expectedUserAction: 'input',
+    });
     expect(session.getState().recentActions).toEqual([
       { type: 'input', label: 'Password', timestamp: 30 },
     ]);
     observer.stop();
   });
 
-  it('keeps invalid input pending until a non-empty valid value is present', () => {
+  it('keeps input pending even after a non-empty valid value is present', () => {
     const input = document.createElement('input');
     input.type = 'text';
     input.setAttribute('aria-invalid', 'true');
@@ -212,11 +216,14 @@ describe('interaction observer', () => {
 
     expect(events[1]).toMatchObject({
       type: 'input-complete',
-      matchedPending: true,
+      matchedPending: false,
       hasValue: true,
       validationState: 'valid',
     });
-    expect(session.getState().pendingAction).toBeUndefined();
+    expect(session.getState().pendingAction).toEqual({
+      targetId: 'el_1',
+      expectedUserAction: 'input',
+    });
     expect(JSON.stringify(events)).not.toContain('"value"');
     observer.stop();
   });
@@ -261,13 +268,16 @@ describe('interaction observer', () => {
       expect(events).toEqual([
         expect.objectContaining({
           type: 'input-complete',
-          matchedPending: true,
+          matchedPending: false,
           hasValue: true,
           validationState: 'valid',
           timestamp: 45,
         }),
       ]);
-      expect(session.getState().pendingAction).toBeUndefined();
+      expect(session.getState().pendingAction).toEqual({
+        targetId: 'el_1',
+        expectedUserAction: 'input',
+      });
       expect(JSON.stringify(events)).not.toContain('"value"');
       observer.stop();
     } finally {

@@ -42,7 +42,7 @@ Vitest with jsdom is configured under `apps/extension/`. Add deterministic exten
 
 ## Architecture and Safety Boundaries
 
-The completed portal must remain free of extension hooks or assistant metadata. The extension may scan, scroll, highlight, speak, and observe actions, but the user must manually submit, consent, confirm, change personal data, enter OTPs, or perform financial actions. Never send raw HTML or sensitive form values to the model; validate every `targetId` against the live registry.
+The completed portal must remain free of extension hooks or assistant metadata. The extension may scan, scroll, highlight, speak, and observe actions, but the user must manually submit, consent, confirm, change personal data, enter OTPs, or perform financial actions. Text-input workflow steps remain pending until the user explicitly says they are done; browser validation alone must not advance them. Never send raw HTML or sensitive form values to the model; validate every `targetId` against the live registry.
 
 ## Commit & Pull Request Guidelines
 

@@ -8,7 +8,7 @@ The assistant guides; the user acts.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/interaction/interaction-observer.ts`. It resolves nested event targets through the element registry, matches actions against pending session state, records only semantic action metadata, reports high-level input/select status without values, observes SPA history/navigation, and never prevents the website's own events. The flow controller consumes unmatched semantic actions to recover against the current page without discarding the active goal.
+The extension implementation lives in `apps/extension/interaction/interaction-observer.ts`. It resolves nested event targets through the element registry, matches click and select actions against pending session state, records only semantic action metadata, reports high-level input status without values, observes SPA history/navigation, and never prevents the website's own events. Text input remains pending until the user explicitly says they are done. The flow controller consumes unmatched semantic actions to recover against the current page without discarding the active goal.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -61,11 +61,11 @@ Emit high-level status instead:
 }
 ```
 
-An expected `input` or `select` action is matched only when the control has a
-value and is not marked invalid. Text-input events are coalesced before an
-`input-complete` event is emitted, while a `change` event flushes completion
-immediately. Empty or invalid controls remain pending; their values never
-leave the page.
+Select actions may be matched after a non-empty, non-invalid change. Text-input
+events are coalesced before an `input-complete` status event is emitted, while a
+`change` event flushes that status immediately. The status event never clears a
+pending text-input action; the user must say a completion phrase such as
+“I’m done” before the flow reasons again. Values never leave the page.
 
 ## Matching Pending Actions
 
@@ -109,4 +109,6 @@ Observe:
 
 ## Definition of Done
 
-The extension reliably knows when the user completed the expected action without taking that action on their behalf.
+The extension observes input safely, waits for explicit user confirmation, and
+reasons again only after the user completes the expected action without taking
+that action on their behalf.

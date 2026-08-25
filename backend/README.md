@@ -24,9 +24,11 @@ reasoning and Sarvam REST APIs for speech. Configure `LITELLM_BASE_URL`,
 speaker, and language settings are also environment-configurable. Provider
 secrets stay in the backend process and never enter the extension bundle.
 
-`PROTOTYPE_MODE=true` explicitly selects the deterministic adapters: a fixed PF
-transcript, silent WAV synthesis, and local target-selection heuristics. This
-mode is retained for offline UI tests only and is not the final MVP path.
+`PROTOTYPE_MODE=true` explicitly selects the deterministic adapters: a PF
+transcript for the first voice turn, an “I'm done” transcript for the next
+voice turn, silent WAV synthesis, and local target-selection heuristics. This
+mode is retained for offline UI tests only and is not the final MVP path; real
+spoken phrases require the provider-backed STT adapter.
 
 The implementation is split into `src/contracts.js` (validation),
 `src/litellm-adapter.js` (reasoning), `src/sarvam-adapters.js` (speech),

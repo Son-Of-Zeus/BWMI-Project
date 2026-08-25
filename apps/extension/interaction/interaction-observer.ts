@@ -150,6 +150,10 @@ function actionMatchesPending(
     return true;
   }
 
+  if (action === 'input') {
+    return false;
+  }
+
   return controlState.hasValue === true && controlState.validationState !== 'invalid';
 }
 

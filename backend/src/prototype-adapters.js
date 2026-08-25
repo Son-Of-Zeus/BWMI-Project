@@ -8,6 +8,11 @@ export const DEFAULT_TRANSCRIPT = Object.freeze({
   language: 'hi-IN',
 });
 
+export const DEFAULT_TRANSCRIPTS = Object.freeze([
+  DEFAULT_TRANSCRIPT,
+  Object.freeze({ transcript: "I'm done.", language: 'en-IN' }),
+]);
+
 const CLICK_ROLES = new Set(['button', 'link', 'menuitem', 'tab', 'interactive']);
 const EXCLUDED_FALLBACK_LABEL = /\b(?:logout|log out|sign out|delete|cancel|reset|remove)\b/i;
 const SUCCESS_CONTEXT = /\b(?:success|submitted|submission complete|acknowledg(?:e)?ment|reference number|application received|request complete)\b/i;
@@ -33,7 +38,7 @@ function isHindi(language) {
 function instructionFor(target, expectedUserAction, language) {
   if (isHindi(language)) {
     if (expectedUserAction === 'input') {
-      return `${target.label} mein apni jankari darj kariye.`;
+      return `${target.label} mein apni jankari darj kariye. Kaam ho jaaye to "I'm done" kahiye.`;
     }
     if (expectedUserAction === 'select') {
       return `${target.label} mein apna option select kariye.`;
@@ -42,7 +47,7 @@ function instructionFor(target, expectedUserAction, language) {
   }
 
   if (expectedUserAction === 'input') {
-    return `Enter your information in ${target.label}.`;
+    return `Enter your information in ${target.label}. Say "I'm done" when finished.`;
   }
   if (expectedUserAction === 'select') {
     return `Select an option in ${target.label}.`;
@@ -119,6 +124,18 @@ function isSubmitIntent(text) {
   return /\b(?:submit|final|finalize|send|file|complete)\b|जमा|सबमिट/i.test(text);
 }
 
+function isInputCompletionIntent(text) {
+  if (/\b(?:not|never|don't|do not)\b.{0,16}\b(?:done|finished|complete|ready)\b/i.test(text)) {
+    return false;
+  }
+
+  return (
+    /\b(?:i[' ]?m|i am|we[' ]?re|we are)?\s*(?:done|finished|complete|completed|ready)\b/i.test(text) ||
+    /\b(?:i[' ]?ve|i have)\s+(?:filled|entered|typed|provided)\b/i.test(text) ||
+    /\b(?:bhar|fill|enter|type)(?:\s+kar)?\s+(?:diya|di|kar diya|ho gaya)\b/i.test(text)
+  );
+}
+
 function isUanQuestion(text) {
   return /\buan\b/i.test(text) &&
     /\b(?:what|kya|meaning|matlab|explain|samajh|hot[ae]?|hota)\b/i.test(text);
@@ -193,7 +210,12 @@ export function createPrototypeReasoner() {
         );
       }
 
-      if (isWithdrawalIntent(utterance)) {
+      const inputCompletionIntent = isInputCompletionIntent(utterance);
+      if (request.session.pendingAction?.type === 'input' && !inputCompletionIntent) {
+        return { action: 'wait' };
+      }
+
+      if (isWithdrawalIntent(utterance) || inputCompletionIntent) {
         const recentOnlineServices = hasRecentActionLabel(
           request.session.recentActions,
           /\bonline services?\b/i,
@@ -306,15 +328,23 @@ export function createPrototypeReasoner() {
   };
 }
 
-export function createPrototypeTranscriber({ transcript = DEFAULT_TRANSCRIPT } = {}) {
-  const result = {
-    transcript: transcript.transcript,
-    ...(transcript.language ? { language: transcript.language } : {}),
-  };
+export function createPrototypeTranscriber({ transcript, transcripts } = {}) {
+  const sequence =
+    Array.isArray(transcripts) && transcripts.length > 0
+      ? transcripts
+      : transcript
+        ? [transcript]
+        : DEFAULT_TRANSCRIPTS;
+  let index = 0;
 
   return {
     async transcribe() {
-      return { ...result };
+      const result = sequence[Math.min(index, sequence.length - 1)];
+      index += 1;
+      return {
+        transcript: result.transcript,
+        ...(result.language ? { language: result.language } : {}),
+      };
     },
   };
 }

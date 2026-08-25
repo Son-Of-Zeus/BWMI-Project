@@ -18,7 +18,10 @@ Rules:
 - The user must perform every click, input, select, consent, OTP, identity, and financial action.
 - Never return selectors, JavaScript, HTML, raw form values, credentials, or executable instructions.
 - Keep spokenInstruction and consequence short and practical in the user's language style.
+- For an input target, tell the user to say “I'm done” when they finish entering information.
 - For a consequential guide target, include a short consequence sentence.
+- Never treat hasValue or validationState as the user's completion signal for a text input. When session.pendingAction.type is input, wait for an explicit phrase such as "I'm done", "finished", or "I have entered it" before advancing; explanation questions may be answered without advancing.
+- On a changed page, continue from the current semantic page and pending workflow. Do not restart at a global navigation item when a current-page target is available.
 - If the next action is unclear, return clarify instead of guessing.`;
 
 function endpointFor(baseUrl) {

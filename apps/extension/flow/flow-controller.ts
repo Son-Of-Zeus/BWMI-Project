@@ -81,8 +81,54 @@ function asError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value));
 }
 
-function defaultWaitForPageSettled(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+export function isInputCompletionUtterance(value: string): boolean {
+  const normalized = value.replace(/[’]/g, "'").replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (
+    /\b(?:not|never|don't|do not)\b.{0,16}\b(?:done|finished|complete|ready)\b/i.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    /\b(?:i[' ]?m|i am|we[' ]?re|we are)?\s*(?:done|finished|complete|completed|ready)\b/i.test(
+      normalized,
+    ) ||
+    /\b(?:i[' ]?ve|i have)\s+(?:filled|entered|typed|provided)\b/i.test(
+      normalized,
+    ) ||
+    /\b(?:bhar|fill|enter|type)(?:\s+kar)?\s+(?:diya|di|kar diya|ho gaya)\b/i.test(
+      normalized,
+    )
+  );
+}
+
+function isInputQuestionUtterance(value: string): boolean {
+  return (
+    /\?/.test(value) ||
+    /\b(?:what|why|how|can|could|please explain|kya|kyun|kaise|kaun)\b/i.test(
+      value,
+    )
+  );
+}
+
+function defaultWaitForPageSettled(documentNode: Document): Promise<void> {
+  const windowNode = documentNode.defaultView;
+  return new Promise((resolve) => {
+    if (windowNode?.requestAnimationFrame) {
+      windowNode.requestAnimationFrame(() => {
+        windowNode.requestAnimationFrame(() => resolve());
+      });
+      return;
+    }
+
+    setTimeout(resolve, 0);
+  });
 }
 
 function pageFromSnapshot(
@@ -121,7 +167,7 @@ export function createFlowController(
 ): FlowController {
   const documentNode = options.document ?? document;
   const waitForPageSettled =
-    options.waitForPageSettled ?? defaultWaitForPageSettled;
+    options.waitForPageSettled ?? (() => defaultWaitForPageSettled(documentNode));
   const listeners = new Set<(snapshot: FlowSnapshot) => void>();
   let snapshot: FlowSnapshot = {
     phase: 'stopped',
@@ -219,12 +265,34 @@ export function createFlowController(
     };
   };
 
+  const waitForInputCompletion = (
+    transcript: SpeechToTextResult,
+  ): FlowResult => {
+    const action: GuideAction = { action: 'wait' };
+    setPhase('waiting');
+    return {
+      status: 'completed',
+      transcript,
+      action,
+      guide: { status: 'completed', action: 'wait' },
+    };
+  };
+
   const reasonAndGuide = async (
     transcript: SpeechToTextResult,
     runGeneration: number,
   ): Promise<FlowResult> => {
     if (!isCurrent(runGeneration)) {
       return { status: 'cancelled' };
+    }
+
+    const pendingAction = options.session.getState().pendingAction;
+    if (
+      pendingAction?.expectedUserAction === 'input' &&
+      !isInputCompletionUtterance(transcript.transcript) &&
+      !isInputQuestionUtterance(transcript.transcript)
+    ) {
+      return waitForInputCompletion(transcript);
     }
 
     setPhase('thinking');
@@ -289,6 +357,13 @@ export function createFlowController(
     if (event.type === 'navigation') {
       options.guide.cancel();
       scheduleContinuation();
+      return;
+    }
+
+    if (
+      event.type === 'input-complete' &&
+      options.session.getState().pendingAction?.expectedUserAction === 'input'
+    ) {
       return;
     }
 

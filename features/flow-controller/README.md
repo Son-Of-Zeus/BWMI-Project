@@ -17,8 +17,9 @@ and interaction observer, reconciles the live registry, builds sanitized
 reasoning requests, runs validated guide actions, schedules the next reasoning
 pass after a matched user action, an unmatched semantic action, or navigation,
 and resets the active demo context on request. An unmatched action clears stale
-guidance while preserving the pending workflow for reconsideration. A new voice
-request cancels stale work while preserving pending context for an explanation;
+guidance while preserving the pending workflow for reconsideration. Text input
+status events do not advance the workflow; a voice completion phrase is
+required. A new voice request cancels stale work while preserving pending context for an explanation;
 recoverable post-transcription failures
 retain a transient transcript for an explicit retry.
 

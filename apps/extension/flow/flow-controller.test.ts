@@ -198,6 +198,51 @@ describe('PF flow controller', () => {
     });
   });
 
+  it('waits for an explicit input completion phrase instead of advancing on validation', async () => {
+    const inputAction: GuideAction = {
+      ...guideAction,
+      expectedUserAction: 'input',
+    };
+    const successAction: GuideAction = {
+      action: 'success',
+      spokenInstruction: 'Aapka request complete ho gaya.',
+      language: 'en-IN',
+    };
+    const harness = createHarness([inputAction, successAction]);
+    harness.flow.start();
+    await harness.flow.requestVoice();
+
+    harness.interactions.emit({
+      type: 'input-complete',
+      action: 'input',
+      targetId: 'el_1',
+      label: 'UAN',
+      matchedPending: false,
+      hasValue: true,
+      validationState: 'valid',
+      timestamp: 1,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+    expect(harness.session.getState().pendingAction).toEqual({
+      targetId: 'el_1',
+      expectedUserAction: 'input',
+    });
+
+    harness.voice.listen = vi.fn(async () => ({
+      status: 'transcript' as const,
+      transcript: "I'm done",
+      language: 'en-IN',
+    }));
+    await expect(harness.flow.requestVoice()).resolves.toMatchObject({
+      status: 'completed',
+      action: successAction,
+    });
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(2);
+    expect(harness.flow.getSnapshot().phase).toBe('success');
+  });
+
   it('retries post-transcription failures without asking for another recording', async () => {
     const harness = createHarness([]);
     const failingReasoner = vi.fn(async () => {
