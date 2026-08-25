@@ -1,10 +1,16 @@
 import ReactDOM from 'react-dom/client';
 import './style.css';
 import { createCompanionUiStore } from '../../companion/companion-ui';
-import { createExtensionRuntime } from '../../runtime/extension-runtime';
+import {
+  createExtensionRuntime,
+  DEFAULT_BACKEND_URL,
+} from '../../runtime/extension-runtime';
 import App from './App';
 
-const mockPortalMatches = ['http://localhost/*', 'http://127.0.0.1/*'];
+const mockPortalMatches = [
+  'http://localhost:5173/*',
+  'http://127.0.0.1:5173/*',
+];
 
 export default defineContentScript({
   matches: mockPortalMatches,
@@ -24,6 +30,7 @@ export default defineContentScript({
         const store = createCompanionUiStore(app);
         const runtime = createExtensionRuntime({
           companion: store,
+          backendUrl: DEFAULT_BACKEND_URL,
         });
         runtime.start();
         const reactMount = document.createElement('div');

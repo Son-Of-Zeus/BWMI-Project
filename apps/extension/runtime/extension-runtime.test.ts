@@ -32,6 +32,7 @@ function createHarness(
   loadingLatencyNoticeMs?: number,
   debug?: ExtensionDebugOptions,
   development?: ExtensionDevelopmentOptions,
+  useBackendClient = false,
 ) {
   const button = document.createElement('button');
   button.textContent = 'Online Services';
@@ -80,10 +81,25 @@ function createHarness(
       };
     }),
   };
+  const backendFetcher = useBackendClient
+    ? vi.fn(async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            action: 'guide',
+            targetId: 'el_1',
+            spokenInstruction: 'Online Services par click kariye.',
+            expectedUserAction: 'click',
+            language: 'hi-IN',
+          }),
+        }) as Response,
+      )
+    : undefined;
   const runtime = createExtensionRuntime({
     document,
     companion,
-    reasoner: development ? undefined : reasoner,
+    reasoner: development || useBackendClient ? undefined : reasoner,
     recorder,
     speechToText: development ? undefined : speechToText,
     textToSpeech,
@@ -95,9 +111,21 @@ function createHarness(
     loadingLatencyNoticeMs,
     debug,
     development,
+    fetcher: backendFetcher,
   });
 
-  return { button, companion, recorder, speechToText, textToSpeech, playback, reasoner, runtime, host };
+  return {
+    button,
+    companion,
+    recorder,
+    speechToText,
+    textToSpeech,
+    playback,
+    reasoner,
+    backendFetcher,
+    runtime,
+    host,
+  };
 }
 
 describe('extension runtime', () => {
@@ -127,6 +155,23 @@ describe('extension runtime', () => {
       pendingAction: { targetId: 'el_1', expectedUserAction: 'click' },
       companionState: 'waiting',
     });
+  });
+
+  it('defaults reasoning requests to the local LiteLLM-backed backend', async () => {
+    const harness = createHarness(undefined, undefined, undefined, true);
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.backendFetcher).toHaveBeenCalledWith(
+      'http://127.0.0.1:8787/reason',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(harness.companion.getSnapshot().state).toBe('waiting');
+
+    harness.runtime.stop();
+    harness.companion.destroy();
   });
 
   it('uses the microphone control to retry a failed request without recording again', async () => {

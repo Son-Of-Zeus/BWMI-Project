@@ -128,6 +128,10 @@ function isStatusIntent(text) {
   return /\b(?:status|track|progress)\b|स्थिति/i.test(text);
 }
 
+function hasRecentActionLabel(actions, pattern) {
+  return actions.some((action) => pattern.test(action.label ?? ''));
+}
+
 function findFallbackTarget(elements, text) {
   const candidates = visibleTargets(elements).filter(
     (element) => !EXCLUDED_FALLBACK_LABEL.test(element.label),
@@ -167,7 +171,10 @@ export function createPrototypeReasoner() {
         .filter(Boolean)
         .join(' ');
 
-      if (SUCCESS_CONTEXT.test(pageText)) {
+      const hasSuccessElement = request.page.elements.some((element) =>
+        SUCCESS_CONTEXT.test(element.label),
+      );
+      if (SUCCESS_CONTEXT.test(pageText) || hasSuccessElement) {
         return successAction(language);
       }
 
@@ -187,6 +194,55 @@ export function createPrototypeReasoner() {
       }
 
       if (isWithdrawalIntent(utterance)) {
+        const recentOnlineServices = hasRecentActionLabel(
+          request.session.recentActions,
+          /\bonline services?\b/i,
+        );
+        const claimForm = findTarget(
+          request.page.elements,
+          /\bclaim\b.*\bform\b|\bform 31\b/i,
+          CLICK_ROLES,
+        );
+        if (claimForm && recentOnlineServices) {
+          return guideTarget(claimForm, language);
+        }
+
+        const uanInput = findTarget(
+          request.page.elements,
+          /\buan\b/i,
+          new Set(['textbox']),
+        );
+        if (uanInput && uanInput.hasValue !== true) {
+          return guideTarget(uanInput, language);
+        }
+
+        const verifyTarget = findTarget(
+          request.page.elements,
+          /\bverify\b/i,
+          CLICK_ROLES,
+        );
+        if (verifyTarget) {
+          return guideTarget(verifyTarget, language);
+        }
+
+        const continueTarget = findTarget(
+          request.page.elements,
+          /\bcontinue(?: to review)?\b/i,
+          CLICK_ROLES,
+        );
+        if (continueTarget) {
+          return guideTarget(continueTarget, language);
+        }
+
+        const confirmationTarget = findTarget(
+          request.page.elements,
+          /\b(?:confirm|reviewed).*\bsubmit\b/i,
+          new Set(['checkbox']),
+        );
+        if (confirmationTarget && confirmationTarget.hasValue !== true) {
+          return guideTarget(confirmationTarget, language);
+        }
+
         const onlineServices = findTarget(
           request.page.elements,
           /\bonline services?\b/i,

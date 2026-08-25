@@ -12,11 +12,16 @@ import {
   validateSpeechResult,
   validateSynthesisInput,
 } from './contracts.js';
+import { createLiteLLMReasoner } from './litellm-adapter.js';
 import {
   createPrototypeReasoner,
   createPrototypeSynthesizer,
   createPrototypeTranscriber,
 } from './prototype-adapters.js';
+import {
+  createSarvamSynthesizer,
+  createSarvamTranscriber,
+} from './sarvam-adapters.js';
 
 const DEFAULT_HOSTNAME = '127.0.0.1';
 const DEFAULT_PORT = 8_787;
@@ -247,10 +252,24 @@ function addressFor(server) {
 }
 
 export function createBackendServer(options = {}) {
+  const usePrototypeAdapters =
+    options.usePrototypeAdapters ?? process.env.PROTOTYPE_MODE === 'true';
   const adapters = {
-    reasoner: options.reasoner ?? createPrototypeReasoner(),
-    transcriber: options.transcriber ?? createPrototypeTranscriber(),
-    synthesizer: options.synthesizer ?? createPrototypeSynthesizer(),
+    reasoner:
+      options.reasoner ??
+      (usePrototypeAdapters
+        ? createPrototypeReasoner()
+        : createLiteLLMReasoner(options.litellm)),
+    transcriber:
+      options.transcriber ??
+      (usePrototypeAdapters
+        ? createPrototypeTranscriber()
+        : createSarvamTranscriber(options.sarvam)),
+    synthesizer:
+      options.synthesizer ??
+      (usePrototypeAdapters
+        ? createPrototypeSynthesizer()
+        : createSarvamSynthesizer(options.sarvam)),
     allowedOrigins: normalizeAllowedOrigins(options.allowedOrigins),
   };
 
@@ -309,6 +328,7 @@ function parsePort(value) {
 async function startFromCommandLine() {
   const app = createBackendServer({
     allowedOrigins: process.env.ALLOWED_ORIGINS ?? '*',
+    usePrototypeAdapters: process.env.PROTOTYPE_MODE === 'true',
   });
   const address = await app.listen(
     parsePort(process.env.PORT ?? DEFAULT_PORT),

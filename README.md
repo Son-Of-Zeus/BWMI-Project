@@ -14,7 +14,7 @@ The extension must guide the user without taking control of consequential action
 
 ## Project Status
 
-The mock portal is complete and should be treated as a read-only integration target. The core extension mechanics and a prototype backend boundary are implemented; ongoing development must stay within the Chrome extension, backend, and supporting feature modules. Do not add portal functionality or extension-specific hooks to the site.
+The mock portal is complete and should be treated as a read-only integration target at `http://localhost:5173`. The core extension mechanics and a local LiteLLM/Sarvam-backed backend boundary are implemented; deployment is deferred. Ongoing development must stay within the Chrome extension, backend, and supporting feature modules. Do not add portal functionality or extension-specific hooks to the site.
 
 ---
 
@@ -44,12 +44,16 @@ project/
 │
 ├── backend/
 │   ├── README.md
+│   ├── .env.example
 │   ├── package.json
 │   ├── src/
 │   │   ├── contracts.js
+│   │   ├── litellm-adapter.js
+│   │   ├── sarvam-adapters.js
 │   │   ├── prototype-adapters.js
 │   │   └── server.js
 │   └── test/
+│       ├── provider-adapters.test.js
 │       └── server.test.js
 │
 └── features/
@@ -445,7 +449,7 @@ Do not mix companion animation state with workflow/session state.
 ### Backend
 
 - Minimal server-side API
-- LLM API with structured output
+- LiteLLM proxy with structured output
 - Sarvam AI for STT/TTS
 - no database required for the first demo
 
@@ -544,12 +548,13 @@ The MVP is successful when:
 9. Initial semantic extraction is DOM/accessibility based, not vision based.
 10. The extension scans common interactive elements and applies limited nearby-context heuristics for poor markup.
 11. The first demo does not promise robust support for arbitrary legacy government websites.
-12. A real LLM is used for target selection in the final MVP demo.
+12. LiteLLM provides the real LLM target-selection endpoint in the final MVP demo.
 13. A mock reasoner may exist only as a development/test adapter.
-14. Sarvam AI is the intended STT/TTS provider.
+14. Sarvam AI provides STT/TTS in the final MVP demo.
 15. Voice APIs and model APIs are called through a backend so secrets are never shipped inside the extension.
 16. The assistant never auto-confirms, submits, consents, changes personal data, or performs financial actions.
 17. Scrolling may be automated.
 18. Sensitive form values are not sent to the reasoning model by default.
 19. No database is required for the first hackathon demo.
 20. The first supported journey is PF withdrawal guidance, including one terminology explanation such as UAN.
+21. The local mock portal runs on port 5173; public deployment is deferred.

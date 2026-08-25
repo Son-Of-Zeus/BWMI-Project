@@ -207,3 +207,157 @@ test('prototype reasoner chooses Online Services for a PF withdrawal request', a
     language: 'hi-IN',
   });
 });
+
+test('prototype reasoner advances through the fictional claim journey', async () => {
+  const reasoner = createPrototypeReasoner();
+  const utterance = 'Mujhe PF ka paisa nikalna hai.';
+  const language = 'hi-IN';
+  const steps = [
+    {
+      recentActions: [],
+      elements: [
+        {
+          id: 'el_online_services',
+          role: 'button',
+          label: 'Online Services',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+      targetId: 'el_online_services',
+      expectedUserAction: 'click',
+    },
+    {
+      recentActions: [{ type: 'click', label: 'Online Services' }],
+      elements: [
+        {
+          id: 'el_claim',
+          role: 'menuitem',
+          label: 'Claim (Form 31, 19 & 10C)',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+      targetId: 'el_claim',
+      expectedUserAction: 'click',
+    },
+    {
+      recentActions: [{ type: 'click', label: 'Claim (Form 31, 19 & 10C)' }],
+      elements: [
+        {
+          id: 'el_uan',
+          role: 'textbox',
+          label: 'Universal Account Number (UAN)',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+          hasValue: false,
+        },
+        {
+          id: 'el_verify',
+          role: 'button',
+          label: 'Verify',
+          visible: true,
+          inViewport: true,
+          disabled: true,
+        },
+      ],
+      targetId: 'el_uan',
+      expectedUserAction: 'input',
+    },
+    {
+      recentActions: [{ type: 'input', label: 'Universal Account Number (UAN)' }],
+      elements: [
+        {
+          id: 'el_uan',
+          role: 'textbox',
+          label: 'Universal Account Number (UAN)',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+          hasValue: true,
+        },
+        {
+          id: 'el_verify',
+          role: 'button',
+          label: 'Verify',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+      targetId: 'el_verify',
+      expectedUserAction: 'click',
+    },
+    {
+      recentActions: [{ type: 'click', label: 'Verify' }],
+      elements: [
+        {
+          id: 'el_continue',
+          role: 'button',
+          label: 'Continue to review',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+      targetId: 'el_continue',
+      expectedUserAction: 'click',
+    },
+    {
+      recentActions: [{ type: 'click', label: 'Continue to review' }],
+      elements: [
+        {
+          id: 'el_confirm',
+          role: 'checkbox',
+          label: 'I confirm that I have reviewed the details and want to submit this claim.',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+          hasValue: false,
+        },
+      ],
+      targetId: 'el_confirm',
+      expectedUserAction: 'click',
+    },
+    {
+      recentActions: [{ type: 'click', label: 'I confirm that I have reviewed the details and want to submit this claim.' }],
+      elements: [
+        {
+          id: 'el_success',
+          role: 'interactive',
+          label: 'Your claim request has been submitted.',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+      expectedAction: 'success',
+    },
+  ];
+
+  for (const step of steps) {
+    const action = await reasoner.reason(
+      validateReasonRequest({
+        userUtterance: utterance,
+        userLanguage: language,
+        session: { recentActions: step.recentActions },
+        page: {
+          title: 'PF Seva Demo',
+          section: 'Online Claim',
+          elements: step.elements,
+        },
+      }),
+    );
+
+    assert.equal(action.action, step.expectedAction ?? 'guide');
+    if (step.expectedAction === 'success') {
+      assert.equal(action.language, language);
+    } else {
+      assert.equal(action.targetId, step.targetId);
+      assert.equal(action.expectedUserAction, step.expectedUserAction);
+    }
+  }
+});

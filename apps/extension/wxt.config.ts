@@ -1,6 +1,13 @@
 import { defineConfig } from 'wxt';
 
-const mockPortalMatches = ['http://localhost/*', 'http://127.0.0.1/*'];
+const mockPortalMatches = [
+  'http://localhost:5173/*',
+  'http://127.0.0.1:5173/*',
+];
+const localBackendMatches = [
+  'http://localhost:8787/*',
+  'http://127.0.0.1:8787/*',
+];
 
 export default defineConfig({
   manifest: ({ mode }) => ({
@@ -10,7 +17,7 @@ export default defineConfig({
         : 'Voice-Native Public-Service Companion',
     description: 'Voice and visual guidance for public-service websites.',
     version: '0.1.0',
-    host_permissions: mockPortalMatches,
+    host_permissions: [...mockPortalMatches, ...localBackendMatches],
     action: {
       default_title: 'Voice Companion',
     },

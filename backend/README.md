@@ -13,19 +13,26 @@ From `backend/`:
 
 ```sh
 npm test     # run the HTTP and adapter contract tests
-npm start    # listen on 127.0.0.1:8787
+npm start    # run LiteLLM/Sarvam-backed API on 127.0.0.1:8787
+PROTOTYPE_MODE=true npm start  # use deterministic adapters without provider keys
 ```
 
 Set `PORT`, `HOST`, or a comma-separated `ALLOWED_ORIGINS` when needed. The
-default adapters are deterministic demo adapters: STT returns the sample PF
-transcript, TTS returns a short silent WAV, and reasoning selects targets from
-the supplied semantic snapshot. They keep the extension demo usable without
-provider credentials; real LLM/Sarvam adapters can be injected at the same
-interfaces later.
+normal server uses a LiteLLM OpenAI-compatible `/chat/completions` endpoint for
+reasoning and Sarvam REST APIs for speech. Configure `LITELLM_BASE_URL`,
+`LITELLM_MODEL`, optional `LITELLM_API_KEY`, and `SARVAM_API_KEY`; Sarvam model,
+speaker, and language settings are also environment-configurable. Provider
+secrets stay in the backend process and never enter the extension bundle.
+
+`PROTOTYPE_MODE=true` explicitly selects the deterministic adapters: a fixed PF
+transcript, silent WAV synthesis, and local target-selection heuristics. This
+mode is retained for offline UI tests only and is not the final MVP path.
 
 The implementation is split into `src/contracts.js` (validation),
-`src/prototype-adapters.js` (demo behavior), and `src/server.js` (HTTP
-transport). `test/server.test.js` covers the public routes and safety boundary.
+`src/litellm-adapter.js` (reasoning), `src/sarvam-adapters.js` (speech),
+`src/prototype-adapters.js` (offline behavior), and `src/server.js` (HTTP
+transport). The backend test files cover transport, provider request shapes,
+response mapping, and safety boundaries.
 
 ## Endpoints
 
@@ -102,7 +109,9 @@ Return playable audio.
 
 ## Deployment
 
-Use the simplest deployment compatible with:
+The current prototype is local-only: the mock portal is expected at
+`http://localhost:5173` and the backend at `http://127.0.0.1:8787`. Deployment
+is intentionally deferred. A later deployment must be compatible with:
 
 - HTTPS
 - low latency
@@ -113,7 +122,7 @@ No database is needed for MVP.
 
 ## Definition of Done
 
-The extension can call reasoning and voice services through this boundary
-without exposing any third-party API key in its distributed bundle. Prototype
-reliability is sufficient for the demo; retries, authentication, persistence,
-and production observability are intentionally out of scope.
+The extension can call LiteLLM and Sarvam through this boundary without
+exposing any third-party API key in its distributed bundle. Prototype
+reliability is sufficient for the local demo; authentication, retries,
+persistence, and production observability remain deferred with deployment.

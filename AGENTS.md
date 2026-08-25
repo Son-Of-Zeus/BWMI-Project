@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains the extension implementation plus architecture READMEs. `README.md` defines the system contracts, MVP journey, proposed stack, and build order. The mock portal is complete and is a read-only integration target; do not develop or modify it. Work only on the extension and its feature boundaries.
+This repository contains the extension, local backend, and architecture READMEs. `README.md` defines the system contracts, MVP journey, proposed stack, and build order. The mock portal is complete and is a read-only integration target; do not develop or modify it. Work only on the extension, backend, and their feature boundaries.
 
 - `apps/extension/`: Manifest V3 extension shell and companion behavior.
 - `apps/mock-portal/`: completed fictional EPFO-style site; read-only test target.

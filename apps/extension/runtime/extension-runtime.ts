@@ -49,6 +49,7 @@ import type { CompanionUiStore } from '../companion/companion-ui';
 export type ExtensionRuntimeOptions = {
   document?: Document;
   companion: CompanionUiStore;
+  backendUrl?: string;
   reasoningEndpoint?: string;
   speechBaseUrl?: string;
   fetcher?: typeof fetch;
@@ -68,6 +69,7 @@ export type ExtensionRuntimeOptions = {
 };
 
 export const DEFAULT_LOADING_LATENCY_NOTICE_MS = 1200;
+export const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8787';
 
 export type ExtensionDevelopmentOptions = {
   enabled: boolean;
@@ -178,8 +180,9 @@ export function createExtensionRuntime(
     registry,
     session,
   });
+  const backendUrl = options.backendUrl ?? DEFAULT_BACKEND_URL;
   const speechClient = createSpeechApiClient({
-    baseUrl: options.speechBaseUrl,
+    baseUrl: options.speechBaseUrl ?? backendUrl,
     fetcher: options.fetcher,
   });
   const voice = createVoiceController({
@@ -210,7 +213,7 @@ export function createExtensionRuntime(
     options.reasoner ??
     development?.reasoner ??
     createReasoningClient({
-      endpoint: options.reasoningEndpoint ?? '/reason',
+      endpoint: options.reasoningEndpoint ?? `${backendUrl}/reason`,
       fetcher: options.fetcher,
     });
   const flow = createFlowController({
