@@ -187,7 +187,10 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
       publish({ ...snapshot, targetRect: rect });
     },
 
-    activateFocusMask() {
+    activateFocusMask(rect) {
+      if (rect) {
+        setRectStyles(focusMask, rect);
+      }
       focusMask.hidden = false;
       publish({ ...snapshot, focusMaskActive: true });
     },

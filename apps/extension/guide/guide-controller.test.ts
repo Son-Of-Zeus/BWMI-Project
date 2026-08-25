@@ -113,6 +113,9 @@ describe('guide controller', () => {
       inline: 'nearest',
     });
     expect(harness.overlay.activateFocusMask).toHaveBeenCalledTimes(1);
+    expect(harness.overlay.activateFocusMask).toHaveBeenCalledWith(
+      expect.objectContaining({ top: 900, bottom: 940 }),
+    );
     expect(harness.overlay.highlight).toHaveBeenCalledWith(
       expect.objectContaining({ top: 900, bottom: 940 }),
     );
@@ -298,6 +301,9 @@ describe('guide controller', () => {
     window.dispatchEvent(new Event('resize'));
 
     expect(harness.overlay.highlight).toHaveBeenLastCalledWith(
+      expect.objectContaining({ top: 220, bottom: 260 }),
+    );
+    expect(harness.overlay.activateFocusMask).toHaveBeenLastCalledWith(
       expect.objectContaining({ top: 220, bottom: 260 }),
     );
     expect(harness.companion.setTarget).toHaveBeenLastCalledWith(

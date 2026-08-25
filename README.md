@@ -76,7 +76,9 @@ project/
     │   └── README.md
     ├── error-recovery/
     │   └── README.md
-    └── movement-timing/
+    ├── movement-timing/
+    │   └── README.md
+    └── focus-mask/
         └── README.md
 ```
 

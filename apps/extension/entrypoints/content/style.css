@@ -15,7 +15,8 @@
 .companion-focus-mask {
   z-index: 2147483645;
   border-radius: 14px;
-  box-shadow: 0 0 0 100vmax rgba(15, 23, 42, 0.34);
+  --companion-mask-color: rgba(15, 23, 42, 0.34);
+  box-shadow: 0 0 0 100vmax var(--companion-mask-color);
   transition: left 180ms ease, top 180ms ease, width 180ms ease,
     height 180ms ease;
 }
@@ -111,6 +112,10 @@
     border-color: #111827;
     box-shadow: 0 0 0 4px #ffffff;
   }
+
+  .companion-focus-mask {
+    --companion-mask-color: rgba(15, 23, 42, 0.52);
+  }
 }
 
 @media (forced-colors: active) {
@@ -135,6 +140,11 @@
   .companion-highlight {
     border-color: Highlight;
     box-shadow: 0 0 0 4px Canvas;
+  }
+
+  .companion-focus-mask {
+    --companion-mask-color: CanvasText;
+    opacity: 0.32;
   }
 }
 

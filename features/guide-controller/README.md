@@ -8,7 +8,7 @@ The guide controller decides **how** guidance is shown.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/guide/guide-controller.ts`. It resolves live registry targets, scrolls with reduced-motion support, remeasures after layout changes, waits for transition-aligned companion movement to settle before speech, drives injected overlay/companion/speech adapters, preserves pending context for explanations, and exposes cancellation without any automatic click capability.
+The extension implementation lives in `apps/extension/guide/guide-controller.ts`. It resolves live registry targets, scrolls with reduced-motion support, remeasures after layout changes, keeps the focus mask aligned with the live target, waits for transition-aligned companion movement to settle before speech, drives injected overlay/companion/speech adapters, preserves pending context for explanations, and exposes cancellation without any automatic click capability.
 
 Run the focused tests from `apps/extension/` with:
 

@@ -9,7 +9,7 @@ export type Viewport = {
 };
 
 export type GuideOverlay = {
-  activateFocusMask(): void;
+  activateFocusMask(rect: DOMRect): void;
   highlight(rect: DOMRect): void;
   clear(): void;
 };
@@ -186,6 +186,7 @@ export function createGuideController(
       }
 
       const rect = entry.element.getBoundingClientRect();
+      options.overlay.activateFocusMask(rect);
       options.overlay.highlight(rect);
       options.companion.setTarget(rect);
     };
@@ -242,7 +243,7 @@ export function createGuideController(
 
     const rect = entry.element.getBoundingClientRect();
     if (present) {
-      options.overlay.activateFocusMask();
+      options.overlay.activateFocusMask(rect);
       options.overlay.highlight(rect);
       options.companion.setTarget(rect);
       setCompanionState('guiding');

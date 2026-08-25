@@ -92,7 +92,7 @@ describe('companion UI', () => {
     const store = createCompanionUiStore(host);
     const target = rect(40, 120, 50, 250);
 
-    store.activateFocusMask();
+    store.activateFocusMask(target);
     store.highlight(target);
 
     const focusMask = host.querySelector('[data-companion-layer="focus-mask"]') as HTMLElement;
@@ -100,6 +100,10 @@ describe('companion UI', () => {
     expect(focusMask.hidden).toBe(false);
     expect(highlight.hidden).toBe(false);
     expect(focusMask.className).toContain('companion-focus-mask');
+    expect(focusMask.style.left).toBe('50px');
+    expect(focusMask.style.top).toBe('40px');
+    expect(focusMask.style.width).toBe('200px');
+    expect(focusMask.style.height).toBe('80px');
     expect(highlight.style.left).toBe('50px');
     expect(highlight.style.top).toBe('40px');
     expect(highlight.style.pointerEvents).toBe('');
@@ -110,8 +114,9 @@ describe('companion UI', () => {
     const host = document.createElement('div');
     document.body.append(host);
     const store = createCompanionUiStore(host);
-    store.activateFocusMask();
-    store.highlight(rect(20, 80));
+    const target = rect(20, 80);
+    store.activateFocusMask(target);
+    store.highlight(target);
 
     store.clear();
     expect(store.getSnapshot()).toMatchObject({
@@ -157,8 +162,9 @@ describe('companion UI', () => {
     const store = createCompanionUiStore(host);
 
     store.setState('waiting');
-    store.activateFocusMask();
-    store.highlight(rect(20, 80));
+    const target = rect(20, 80);
+    store.activateFocusMask(target);
+    store.highlight(target);
     store.resetDemo();
 
     expect(store.getSnapshot()).toMatchObject({
