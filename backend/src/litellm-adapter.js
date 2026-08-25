@@ -99,6 +99,7 @@ async function responseJson(response) {
 
 export function createLiteLLMReasoner(options = {}) {
   const fetcher = options.fetcher ?? fetch;
+  const logger = options.logger ?? console.log;
   const endpoint = endpointFor(
     options.endpoint ??
       process.env.LITELLM_CHAT_COMPLETIONS_URL ??
@@ -116,6 +117,7 @@ export function createLiteLLMReasoner(options = {}) {
         headers.authorization = `Bearer ${apiKey}`;
       }
 
+      logger('[LLM call]');
       const response = await fetcher(endpoint, {
         method: 'POST',
         headers,

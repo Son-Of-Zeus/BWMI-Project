@@ -34,11 +34,14 @@ function createReasonRequest() {
 
 test('LiteLLM adapter sends an OpenAI-compatible structured reasoning request', async () => {
   let captured;
+  const events = [];
   const reasoner = createLiteLLMReasoner({
     endpoint: 'http://litellm.test/v1',
     model: 'demo-model',
     apiKey: 'test-key',
+    logger: (...args) => events.push(['log', args]),
     fetcher: async (url, init) => {
+      events.push(['fetch']);
       captured = { url, init };
       return {
         ok: true,
@@ -65,6 +68,8 @@ test('LiteLLM adapter sends an OpenAI-compatible structured reasoning request', 
   });
 
   await assert.doesNotReject(() => reasoner.reason(createReasonRequest()));
+  assert.deepEqual(events[0], ['log', ['[LLM call]']]);
+  assert.deepEqual(events[1], ['fetch']);
   assert.equal(captured.url, 'http://litellm.test/v1/chat/completions');
   assert.equal(captured.init.headers.authorization, 'Bearer test-key');
 

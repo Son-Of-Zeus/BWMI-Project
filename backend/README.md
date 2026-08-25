@@ -36,6 +36,9 @@ The implementation is split into `src/contracts.js` (validation),
 transport). The backend test files cover transport, provider request shapes,
 response mapping, and safety boundaries.
 
+When the LiteLLM adapter is active, the backend logs `[LLM call]` immediately
+before each provider request without logging the prompt or page context.
+
 ## Endpoints
 
 ```text
