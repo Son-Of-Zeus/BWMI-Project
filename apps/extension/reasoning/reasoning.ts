@@ -4,6 +4,11 @@ import type {
   SessionState,
 } from '../session/session-state';
 import type { SemanticElement } from '../registry/element-registry';
+import {
+  evaluateGuideActionSafety,
+  redactSensitiveText,
+  type SafetyTarget,
+} from '../safety/safety';
 
 export type ReasonRequest = {
   userUtterance: string;
@@ -153,9 +158,26 @@ function requireLanguage(value: unknown): string {
   return requireString(value, 'language', 24);
 }
 
+function enforceTargetSafety(
+  action: GuideAction,
+  targetMetadata?: Iterable<SafetyTarget>,
+): GuideAction {
+  if (!targetMetadata) {
+    return action;
+  }
+
+  const decision = evaluateGuideActionSafety(action, targetMetadata);
+  if (!decision.allowed) {
+    throw new ReasoningValidationError(`Unsafe GuideAction: ${decision.reason}`);
+  }
+
+  return action;
+}
+
 export function validateGuideAction(
   value: unknown,
   availableTargetIds: Iterable<string>,
+  targetMetadata?: Iterable<SafetyTarget>,
 ): GuideAction {
   if (!isRecord(value)) {
     throw new ReasoningValidationError('GuideAction must be an object');
@@ -186,13 +208,13 @@ export function validateGuideAction(
           'expectedUserAction must be click, input, or select',
         );
       }
-      return {
+      return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
         spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
         expectedUserAction,
         language: requireLanguage(value.language),
-      };
+      }, targetMetadata);
     }
 
     case 'explain':
@@ -202,19 +224,19 @@ export function validateGuideAction(
         'spokenInstruction',
         'language',
       ]);
-      return {
+      return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
         spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
         language: requireLanguage(value.language),
-      };
+      }, targetMetadata);
 
     case 'scroll':
       requireAllowedKeys(value, ['action', 'targetId']);
-      return {
+      return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
-      };
+      }, targetMetadata);
 
     case 'wait':
       requireAllowedKeys(value, ['action']);
@@ -237,6 +259,7 @@ export function validateGuideAction(
 export function parseGuideActionJson(
   raw: string,
   availableTargetIds: Iterable<string>,
+  targetMetadata?: Iterable<SafetyTarget>,
 ): GuideAction {
   let parsed: unknown;
   try {
@@ -245,21 +268,21 @@ export function parseGuideActionJson(
     throw new ReasoningValidationError('Reasoning response is not valid JSON');
   }
 
-  return validateGuideAction(parsed, availableTargetIds);
+  return validateGuideAction(parsed, availableTargetIds, targetMetadata);
 }
 
 function safeSemanticElement(element: SemanticElement): SemanticElement {
   const safeElement: SemanticElement = {
     id: element.id,
     role: element.role,
-    label: element.label,
+    label: redactSensitiveText(element.label),
     visible: element.visible,
     inViewport: element.inViewport,
     disabled: element.disabled,
   };
 
   if (element.section !== undefined) {
-    safeElement.section = element.section;
+    safeElement.section = redactSensitiveText(element.section);
   }
   if (element.hasValue !== undefined) {
     safeElement.hasValue = element.hasValue;
@@ -273,16 +296,26 @@ function safeSemanticElement(element: SemanticElement): SemanticElement {
 
 export function sanitizeReasonRequest(request: ReasonRequest): ReasonRequest {
   const safeRequest: ReasonRequest = {
-    userUtterance: requireString(request.userUtterance, 'userUtterance'),
+    userUtterance: redactSensitiveText(
+      requireString(request.userUtterance, 'userUtterance'),
+    ),
     session: {
       recentActions: request.session.recentActions.map((action) => ({
         type: requireString(action.type, 'session.recentActions.type', 40),
         ...(action.label
-          ? { label: requireString(action.label, 'session.recentActions.label') }
+          ? {
+              label: redactSensitiveText(
+                requireString(action.label, 'session.recentActions.label'),
+              ),
+            }
           : {}),
       })),
       ...(request.session.goal
-        ? { goal: requireString(request.session.goal, 'session.goal') }
+        ? {
+            goal: redactSensitiveText(
+              requireString(request.session.goal, 'session.goal'),
+            ),
+          }
         : {}),
       ...(request.session.pendingAction
         ? {
@@ -291,7 +324,9 @@ export function sanitizeReasonRequest(request: ReasonRequest): ReasonRequest {
               ...(request.session.pendingAction.targetLabel
                 ? {
                     targetLabel: requireString(
-                      request.session.pendingAction.targetLabel,
+                      redactSensitiveText(
+                        request.session.pendingAction.targetLabel,
+                      ),
                       'session.pendingAction.targetLabel',
                     ),
                   }
@@ -303,10 +338,18 @@ export function sanitizeReasonRequest(request: ReasonRequest): ReasonRequest {
     page: {
       elements: request.page.elements.map(safeSemanticElement),
       ...(request.page.title
-        ? { title: requireString(request.page.title, 'page.title') }
+        ? {
+            title: redactSensitiveText(
+              requireString(request.page.title, 'page.title'),
+            ),
+          }
         : {}),
       ...(request.page.section
-        ? { section: requireString(request.page.section, 'page.section') }
+        ? {
+            section: redactSensitiveText(
+              requireString(request.page.section, 'page.section'),
+            ),
+          }
         : {}),
     },
   };
@@ -390,6 +433,7 @@ export function createReasoningClient(
       return validateGuideAction(
         payload,
         safeRequest.page.elements.map((element) => element.id),
+        safeRequest.page.elements,
       );
     },
   };

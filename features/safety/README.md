@@ -4,6 +4,21 @@
 
 The assistant guides the user. It does not take control of consequential actions.
 
+## Current Extension Implementation
+
+The policy lives in `apps/extension/safety/safety.ts`. It redacts common
+personal values before reasoning requests leave the extension, classifies
+consequential labels, requires explicit user action for guided targets, and
+blocks disabled targets. Reasoning applies the policy to backend responses,
+and the guide controller applies it again before speaking or creating pending
+workflow state.
+
+Run the focused policy tests from `apps/extension/` with:
+
+```sh
+npm test -- --run safety/safety.test.ts
+```
+
 ## User Must Act Manually
 
 The extension must not automatically:

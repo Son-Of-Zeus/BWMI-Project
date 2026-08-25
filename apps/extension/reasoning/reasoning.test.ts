@@ -108,7 +108,21 @@ describe('reasoning boundary', () => {
         },
         ['el_1'],
       ),
-    ).toThrow(/Unexpected GuideAction field/);
+      ).toThrow(/Unexpected GuideAction field/);
+
+    expect(() =>
+      validateGuideAction(
+        {
+          action: 'guide',
+          targetId: 'el_1',
+          spokenInstruction: 'Click.',
+          expectedUserAction: 'click',
+          language: 'en-IN',
+        },
+        ['el_1'],
+        [{ id: 'el_1', role: 'button', label: 'Submit', disabled: true }],
+      ),
+    ).toThrow(/Unsafe GuideAction/);
   });
 
   it('validates target-free recovery actions and rejects executable instructions', () => {
@@ -234,6 +248,34 @@ describe('reasoning boundary', () => {
         page: { elements },
       }),
     ).rejects.toBeInstanceOf(ReasoningValidationError);
+
+    const disabledResponseFetcher = vi.fn(async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          action: 'guide',
+          targetId: 'el_1',
+          spokenInstruction: 'Submit par click kariye.',
+          expectedUserAction: 'click',
+          language: 'en-IN',
+        }),
+      }) as Response,
+    );
+    const disabledClient = createReasoningClient({
+      endpoint: 'https://example.test/reason',
+      fetcher: disabledResponseFetcher,
+    });
+
+    await expect(
+      disabledClient.reason({
+        userUtterance: 'Submit karna hai',
+        session: { recentActions: [] },
+        page: {
+          elements: [{ ...elements[0]!, disabled: true }],
+        },
+      }),
+    ).rejects.toThrow(/Unsafe GuideAction/);
   });
 
   it('sanitizes optional request fields without inventing workflow context', () => {
@@ -252,5 +294,31 @@ describe('reasoning boundary', () => {
       session: { recentActions: [] },
       page: { elements: [elements[0]] },
     });
+  });
+
+  it('redacts sensitive values from user, session, and semantic context', () => {
+    const request = sanitizeReasonRequest({
+      userUtterance: 'Mera UAN 100200300400 hai',
+      session: {
+        goal: 'Phone 9876543210 update karna hai',
+        recentActions: [{ type: 'input', label: 'Account 123456789012' }],
+      },
+      page: {
+        title: 'Member 123456789012',
+        section: 'Bank 9876543210',
+        elements: [
+          {
+            ...elements[0]!,
+            label: 'Account 123456789012',
+          },
+        ],
+      },
+    });
+
+    const serialized = JSON.stringify(request);
+    expect(serialized).not.toContain('100200300400');
+    expect(serialized).not.toContain('9876543210');
+    expect(serialized).not.toContain('123456789012');
+    expect(serialized).toContain('[redacted]');
   });
 });

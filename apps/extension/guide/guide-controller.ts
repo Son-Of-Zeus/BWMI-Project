@@ -1,6 +1,7 @@
 import type { CompanionState, SessionStateStore } from '../session/session-state';
 import type { ElementRegistry, RegistryEntry } from '../registry/element-registry';
 import type { GuideAction } from '../reasoning/reasoning';
+import { evaluateGuideActionSafety } from '../safety/safety';
 
 export type Viewport = {
   width: number;
@@ -40,6 +41,7 @@ export type GuideResult =
   | { status: 'guided'; targetId: string }
   | { status: 'completed'; action: GuideAction['action'] }
   | { status: 'stale-target'; targetId: string }
+  | { status: 'blocked'; reason: string }
   | { status: 'cancelled' }
   | { status: 'error'; error: Error };
 
@@ -243,6 +245,13 @@ export function createGuideController(
     return { status: 'error', error: asError(error) };
   };
 
+  const finishBlocked = (reason: string): GuideResult => {
+    clearTracking();
+    options.overlay.clear();
+    setCompanionState('error');
+    return { status: 'blocked', reason };
+  };
+
   const runSpeech = async (
     text: string,
     language: string,
@@ -265,6 +274,16 @@ export function createGuideController(
     async run(action) {
       cancelInternal(action.action === 'explain');
       const runGeneration = generation;
+
+      if (action.action === 'guide') {
+        const liveTarget = options.registry.getLive(action.targetId);
+        if (liveTarget) {
+          const safety = evaluateGuideActionSafety(action, [liveTarget]);
+          if (!safety.allowed) {
+            return finishBlocked(safety.reason);
+          }
+        }
+      }
 
       if (action.action === 'wait') {
         setCompanionState('waiting');

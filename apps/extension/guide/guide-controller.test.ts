@@ -19,18 +19,25 @@ function rect(top: number, bottom: number, left = 10, right = 210): DOMRect {
   } as DOMRect;
 }
 
-function discovered(element: HTMLElement, label = 'Target'): DiscoveredElement {
+function discovered(
+  element: HTMLElement,
+  label = 'Target',
+  disabled = false,
+): DiscoveredElement {
   return {
     role: 'button',
     label,
     visible: true,
     inViewport: true,
-    disabled: false,
+    disabled,
     element,
   };
 }
 
-function createHarness(initialRect = rect(100, 140)) {
+function createHarness(
+  initialRect = rect(100, 140),
+  disabled = false,
+) {
   const element = document.createElement('button');
   element.textContent = 'Target';
   document.body.append(element);
@@ -42,7 +49,7 @@ function createHarness(initialRect = rect(100, 140)) {
   });
 
   const registry = createElementRegistry();
-  registry.reconcile([discovered(element)]);
+  registry.reconcile([discovered(element, 'Target', disabled)]);
   const session = createSessionState();
   const overlay: GuideOverlay = {
     activateFocusMask: vi.fn(),
@@ -176,6 +183,22 @@ describe('guide controller', () => {
     expect(missing).toHaveBeenCalledWith('el_1');
     expect(harness.speech.say).not.toHaveBeenCalled();
     expect(harness.overlay.highlight).not.toHaveBeenCalled();
+  });
+
+  it('blocks guidance to a disabled target before speaking or creating a pending action', async () => {
+    const harness = createHarness(rect(100, 140), true);
+    const result = await harness.controller.run({
+      action: 'guide',
+      targetId: 'el_1',
+      spokenInstruction: 'Submit par click kariye.',
+      expectedUserAction: 'click',
+      language: 'en-IN',
+    });
+
+    expect(result).toMatchObject({ status: 'blocked' });
+    expect(harness.speech.say).not.toHaveBeenCalled();
+    expect(harness.overlay.highlight).not.toHaveBeenCalled();
+    expect(harness.session.getState().pendingAction).toBeUndefined();
   });
 
   it('remeasures the target after a resize while waiting', async () => {
