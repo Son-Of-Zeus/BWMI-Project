@@ -65,6 +65,7 @@ type GuideAction =
       action: "guide";
       targetId: string;
       spokenInstruction: string;
+      consequence?: string;
       expectedUserAction: "click" | "input" | "select";
       language: string;
     }
@@ -105,7 +106,9 @@ Avoid:
 
 Default to one sentence.
 
-Use a second short sentence only when explanation or consequence is necessary.
+Use a second short sentence only when explanation is necessary. For a
+consequential target, provide a short `consequence` sentence explaining what
+the user's manual action will do.
 
 ## Same-Language Behavior
 

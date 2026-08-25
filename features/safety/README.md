@@ -12,6 +12,8 @@ consequential labels, requires explicit user action for guided targets, and
 blocks disabled targets. Reasoning applies the policy to backend responses,
 and the guide controller applies it again before speaking or creating pending
 workflow state.
+For consequential guide targets it also requires a bounded spoken consequence
+explanation before the guide can be offered.
 
 Run the focused policy tests from `apps/extension/` with:
 
@@ -84,7 +86,9 @@ Reject responses when:
 
 ## Consequence Explanation
 
-Before a final action, the spoken instruction should explain what the click will do.
+Before a consequential action, the model response must include a short
+consequence explanation. The guide speaks it before the manual-action
+instruction.
 
 Example:
 

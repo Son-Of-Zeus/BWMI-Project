@@ -305,6 +305,8 @@ export function createGuideController(
     async run(action) {
       cancelInternal(action.action === 'explain');
       const runGeneration = generation;
+      let spokenInstruction =
+        'spokenInstruction' in action ? action.spokenInstruction : undefined;
 
       if (action.action === 'guide') {
         const liveTarget = options.registry.getLive(action.targetId);
@@ -313,6 +315,14 @@ export function createGuideController(
           if (!safety.allowed) {
             return finishBlocked(safety.reason);
           }
+          if (safety.consequence && !action.consequence?.trim()) {
+            return finishBlocked(
+              'Consequential guidance requires a spoken consequence explanation.',
+            );
+          }
+        }
+        if (action.consequence) {
+          spokenInstruction = `${action.consequence} ${action.spokenInstruction}`;
         }
       }
 
@@ -351,7 +361,7 @@ export function createGuideController(
       }
 
       const speechResult = await runSpeech(
-        action.spokenInstruction,
+        spokenInstruction!,
         action.language,
         runGeneration,
       );

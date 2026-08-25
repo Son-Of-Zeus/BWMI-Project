@@ -37,9 +37,10 @@ function discovered(
 function createHarness(
   initialRect = rect(100, 140),
   disabled = false,
+  label = 'Target',
 ) {
   const element = document.createElement('button');
-  element.textContent = 'Target';
+  element.textContent = label;
   document.body.append(element);
   let currentRect = initialRect;
   vi.spyOn(element, 'getBoundingClientRect').mockImplementation(() => currentRect);
@@ -49,7 +50,7 @@ function createHarness(
   });
 
   const registry = createElementRegistry();
-  registry.reconcile([discovered(element, 'Target', disabled)]);
+  registry.reconcile([discovered(element, label, disabled)]);
   const session = createSessionState();
   const overlay: GuideOverlay = {
     activateFocusMask: vi.fn(),
@@ -285,6 +286,42 @@ describe('guide controller', () => {
     expect(harness.speech.say).not.toHaveBeenCalled();
     expect(harness.overlay.highlight).not.toHaveBeenCalled();
     expect(harness.session.getState().pendingAction).toBeUndefined();
+  });
+
+  it('blocks consequential guidance when no consequence explanation is supplied', async () => {
+    const harness = createHarness(rect(100, 140), false, 'Submit Claim');
+    const result = await harness.controller.run({
+      action: 'guide',
+      targetId: 'el_1',
+      spokenInstruction: 'Submit Claim par click kariye.',
+      expectedUserAction: 'click',
+      language: 'hi-IN',
+    });
+
+    expect(result).toMatchObject({ status: 'blocked' });
+    expect(harness.speech.say).not.toHaveBeenCalled();
+    expect(harness.session.getState().pendingAction).toBeUndefined();
+  });
+
+  it('speaks the consequence before the manual consequential action instruction', async () => {
+    const harness = createHarness(rect(100, 140), false, 'Submit Claim');
+    const result = await harness.controller.run({
+      action: 'guide',
+      targetId: 'el_1',
+      consequence: 'Isse aapki claim request submit ho jayegi.',
+      spokenInstruction: 'Details sahi hain to Submit Claim par khud click kariye.',
+      expectedUserAction: 'click',
+      language: 'hi-IN',
+    });
+
+    expect(result).toEqual({ status: 'guided', targetId: 'el_1' });
+    expect(harness.speech.say).toHaveBeenCalledWith(
+      'Isse aapki claim request submit ho jayegi. Details sahi hain to Submit Claim par khud click kariye.',
+      'hi-IN',
+    );
+    expect(harness.session.getState()).toMatchObject({
+      pendingAction: { targetId: 'el_1', expectedUserAction: 'click' },
+    });
   });
 
   it('remeasures the target after a resize while waiting', async () => {

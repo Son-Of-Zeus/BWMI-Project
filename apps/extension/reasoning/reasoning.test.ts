@@ -151,6 +151,36 @@ describe('reasoning boundary', () => {
     ).toThrow(/Unsafe GuideAction/);
   });
 
+  it('requires a consequence explanation for consequential guide targets', () => {
+    const metadata = [
+      { id: 'el_1', role: 'button' as const, label: 'Submit Claim', disabled: false },
+    ];
+    const baseAction = {
+      action: 'guide' as const,
+      targetId: 'el_1',
+      spokenInstruction: 'Details sahi hain to khud click kariye.',
+      expectedUserAction: 'click' as const,
+      language: 'hi-IN',
+    };
+
+    expect(() => validateGuideAction(baseAction, ['el_1'], metadata)).toThrow(
+      /consequence explanation/,
+    );
+    expect(
+      validateGuideAction(
+        {
+          ...baseAction,
+          consequence: 'Isse aapki claim request submit ho jayegi.',
+        },
+        ['el_1'],
+        metadata,
+      ),
+    ).toEqual({
+      ...baseAction,
+      consequence: 'Isse aapki claim request submit ho jayegi.',
+    });
+  });
+
   it('validates target-free recovery actions and rejects executable instructions', () => {
     expect(
       validateGuideAction(

@@ -86,7 +86,9 @@ project/
     │   └── README.md
     ├── interaction-recovery/
     │   └── README.md
-    └── form-completion/
+    ├── form-completion/
+    │   └── README.md
+    └── consequence-guidance/
         └── README.md
 ```
 
@@ -296,6 +298,7 @@ export type GuideAction =
       action: "guide";
       targetId: string;
       spokenInstruction: string;
+      consequence?: string;
       expectedUserAction: "click" | "input" | "select";
       language: string;
     }

@@ -36,6 +36,7 @@ export type GuideAction =
       action: 'guide';
       targetId: string;
       spokenInstruction: string;
+      consequence?: string;
       expectedUserAction: ExpectedUserAction;
       language: string;
     }
@@ -172,6 +173,12 @@ function enforceTargetSafety(
     throw new ReasoningValidationError(`Unsafe GuideAction: ${decision.reason}`);
   }
 
+  if (action.action === 'guide' && decision.consequence && !action.consequence) {
+    throw new ReasoningValidationError(
+      'Consequential guide actions require a consequence explanation',
+    );
+  }
+
   return action;
 }
 
@@ -196,6 +203,7 @@ export function validateGuideAction(
         'action',
         'targetId',
         'spokenInstruction',
+        'consequence',
         'expectedUserAction',
         'language',
       ]);
@@ -209,10 +217,15 @@ export function validateGuideAction(
           'expectedUserAction must be click, input, or select',
         );
       }
+      const consequence =
+        value.consequence === undefined
+          ? undefined
+          : requireSpokenInstruction(value.consequence);
       return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
         spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
+        ...(consequence ? { consequence } : {}),
         expectedUserAction,
         language: requireLanguage(value.language),
       }, targetMetadata);
