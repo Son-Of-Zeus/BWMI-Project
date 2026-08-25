@@ -8,6 +8,16 @@ The LLM decides **what** should happen.
 
 It does not manipulate the browser.
 
+## Current Implementation
+
+The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npx vitest run reasoning/reasoning.test.ts
+```
+
 ## Input
 
 A reasoning request should contain only the minimum context required:
