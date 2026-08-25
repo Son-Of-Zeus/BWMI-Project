@@ -36,6 +36,7 @@ export type FlowSnapshot = {
   phase: FlowPhase;
   page: ReasoningPage | null;
   lastTranscript?: SpeechToTextResult;
+  retryTranscript?: SpeechToTextResult;
   lastAction?: GuideAction;
   error?: Error;
 };
@@ -71,6 +72,7 @@ export type FlowController = {
   reset(): void;
   refresh(): ReasoningPage;
   requestVoice(): Promise<FlowResult>;
+  retry(): Promise<FlowResult>;
   cancel(): void;
 };
 
@@ -168,10 +170,14 @@ export function createFlowController(
   const isCurrent = (runGeneration: number) =>
     started && generation === runGeneration;
 
-  const fail = (error: unknown): FlowResult => {
+  const fail = (
+    error: unknown,
+    retryTranscript?: SpeechToTextResult,
+  ): FlowResult => {
     const normalized = asError(error);
     options.voice.setState('error');
     setPhase('error', normalized);
+    publish({ ...snapshot, retryTranscript });
     options.onError?.(normalized);
     return { status: 'error', error: normalized };
   };
@@ -185,13 +191,16 @@ export function createFlowController(
       return { status: 'cancelled' };
     }
     if (guideResult.status === 'error') {
-      return fail(guideResult.error);
+      return fail(guideResult.error, transcript);
     }
     if (guideResult.status === 'blocked') {
-      return fail(new Error(guideResult.reason));
+      return fail(new Error(guideResult.reason), transcript);
     }
     if (guideResult.status === 'stale-target') {
-      return fail(new Error(`Target ${guideResult.targetId} is no longer live.`));
+      return fail(
+        new Error(`Target ${guideResult.targetId} is no longer live.`),
+        transcript,
+      );
     }
 
     setPhase(
@@ -244,7 +253,7 @@ export function createFlowController(
       if (!isCurrent(runGeneration)) {
         return { status: 'cancelled' };
       }
-      return fail(error);
+      return fail(error, transcript);
     }
   };
 
@@ -282,10 +291,18 @@ export function createFlowController(
     }
   };
 
+  const clearRetryTranscript = () => {
+    if (!snapshot.retryTranscript) {
+      return;
+    }
+    publish({ ...snapshot, retryTranscript: undefined });
+  };
+
   const cancel = () => {
     beginRun();
     options.guide.cancel();
     options.voice.cancel();
+    clearRetryTranscript();
     setPhase(started ? 'idle' : 'stopped');
   };
 
@@ -304,6 +321,67 @@ export function createFlowController(
     publish({ phase: 'idle', page: null });
     refresh();
     setPhase('idle');
+  };
+
+  const requestVoice = async (): Promise<FlowResult> => {
+    if (!started) {
+      return fail(new Error('Flow controller is not started.'));
+    }
+
+    clearRetryTranscript();
+    const runGeneration = beginRun();
+    const preservePendingAction = Boolean(
+      options.session.getState().pendingAction,
+    );
+    options.guide.cancel({ preservePendingAction });
+    setPhase('listening');
+
+    let voiceResult: VoiceResult;
+    try {
+      voiceResult = await options.voice.listen();
+    } catch (error) {
+      if (!isCurrent(runGeneration)) {
+        return { status: 'cancelled' };
+      }
+      return fail(error);
+    }
+
+    if (!isCurrent(runGeneration)) {
+      return { status: 'cancelled' };
+    }
+    if (voiceResult.status === 'cancelled') {
+      setPhase('idle');
+      return { status: 'cancelled' };
+    }
+    if (voiceResult.status === 'error') {
+      return fail(voiceResult.error);
+    }
+
+    const transcript: SpeechToTextResult = {
+      transcript: voiceResult.transcript,
+      ...(voiceResult.language ? { language: voiceResult.language } : {}),
+    };
+    publish({ ...snapshot, lastTranscript: transcript });
+    if (!options.session.getState().goal) {
+      options.session.setGoal(transcript.transcript);
+    }
+    return reasonAndGuide(transcript, runGeneration);
+  };
+
+  const retry = async (): Promise<FlowResult> => {
+    if (!started || !snapshot.retryTranscript) {
+      return requestVoice();
+    }
+
+    const transcript = snapshot.retryTranscript;
+    clearRetryTranscript();
+    const runGeneration = beginRun();
+    const preservePendingAction = Boolean(
+      options.session.getState().pendingAction,
+    );
+    options.guide.cancel({ preservePendingAction });
+    setPhase('thinking');
+    return reasonAndGuide(transcript, runGeneration);
   };
 
   return {
@@ -363,45 +441,9 @@ export function createFlowController(
 
     refresh,
 
-    async requestVoice() {
-      if (!started) {
-        return fail(new Error('Flow controller is not started.'));
-      }
+    requestVoice,
 
-      const runGeneration = beginRun();
-      const preservePendingAction = Boolean(
-        options.session.getState().pendingAction,
-      );
-      options.guide.cancel({ preservePendingAction });
-      setPhase('listening');
-
-      let voiceResult: VoiceResult;
-      try {
-        voiceResult = await options.voice.listen();
-      } catch (error) {
-        if (!isCurrent(runGeneration)) {
-          return { status: 'cancelled' };
-        }
-        return fail(error);
-      }
-
-      if (!isCurrent(runGeneration)) {
-        return { status: 'cancelled' };
-      }
-      if (voiceResult.status === 'cancelled') {
-        setPhase('idle');
-        return { status: 'cancelled' };
-      }
-      if (voiceResult.status === 'error') {
-        return fail(voiceResult.error);
-      }
-
-      publish({ ...snapshot, lastTranscript: voiceResult });
-      if (!options.session.getState().goal) {
-        options.session.setGoal(voiceResult.transcript);
-      }
-      return reasonAndGuide(voiceResult, runGeneration);
-    },
+    retry,
 
     cancel,
   };

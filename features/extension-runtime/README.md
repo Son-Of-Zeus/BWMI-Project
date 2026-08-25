@@ -11,7 +11,8 @@ the companion a clean lifecycle.
 session, interaction observer, voice controller, guide controller, and PF flow
 controller. It binds the companion microphone to `requestVoice()`, binds the
 demo-reset control to the flow reset boundary, maps runtime states into the UI,
-and announces slow reasoning or speech after a bounded latency threshold. It
+announces slow reasoning or speech after a bounded latency threshold, and
+routes an error-state microphone press to transcript-aware flow retry. It
 accepts injected adapters for deterministic tests or a different backend
 deployment.
 

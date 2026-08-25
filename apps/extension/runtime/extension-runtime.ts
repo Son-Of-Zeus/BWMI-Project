@@ -187,6 +187,10 @@ export function createExtensionRuntime(
       voice.stopListening();
       return;
     }
+    if (flow.getSnapshot().phase === 'error') {
+      void flow.retry();
+      return;
+    }
     void flow.requestVoice();
   };
   const handleReset = () => {

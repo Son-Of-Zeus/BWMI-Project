@@ -117,6 +117,34 @@ describe('extension runtime', () => {
     });
   });
 
+  it('uses the microphone control to retry a failed request without recording again', async () => {
+    const harness = createHarness();
+    let reasonCalls = 0;
+    harness.reasoner.reason = vi.fn(async () => {
+      reasonCalls += 1;
+      if (reasonCalls === 1) {
+        throw new Error('Reasoning service unavailable.');
+      }
+      return { action: 'wait' as const };
+    });
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(harness.companion.getSnapshot().state).toBe('error');
+    expect(harness.recorder.record).toHaveBeenCalledTimes(1);
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(reasonCalls).toBe(2);
+    expect(harness.recorder.record).toHaveBeenCalledTimes(1);
+    expect(harness.companion.getSnapshot().state).toBe('waiting');
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
   it('resets extension state through the companion demo control', async () => {
     const harness = createHarness();
     harness.runtime.start();

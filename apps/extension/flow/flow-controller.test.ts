@@ -197,6 +197,64 @@ describe('PF flow controller', () => {
     });
   });
 
+  it('retries post-transcription failures without asking for another recording', async () => {
+    const harness = createHarness([]);
+    const failingReasoner = vi.fn(async () => {
+      throw new Error('Reasoning service unavailable.');
+    });
+    harness.reasoner.reason = failingReasoner;
+    harness.flow.start();
+
+    const failed = await harness.flow.requestVoice();
+
+    expect(failed).toMatchObject({ status: 'error' });
+    expect(harness.voice.listen).toHaveBeenCalledTimes(1);
+    expect(harness.flow.getSnapshot().retryTranscript).toEqual(initialTranscript);
+
+    const retryReasoner = vi.fn(async () => ({ action: 'wait' as const }));
+    harness.reasoner.reason = retryReasoner;
+    const retried = await harness.flow.retry();
+
+    expect(retried).toMatchObject({
+      status: 'completed',
+      action: { action: 'wait' },
+    });
+    expect(harness.voice.listen).toHaveBeenCalledTimes(1);
+    expect(failingReasoner).toHaveBeenCalledTimes(1);
+    expect(retryReasoner).toHaveBeenCalledTimes(1);
+    expect(harness.flow.getSnapshot()).toMatchObject({
+      phase: 'waiting',
+      retryTranscript: undefined,
+    });
+  });
+
+  it('falls back to fresh voice capture when the original request has no transcript', async () => {
+    const harness = createHarness([{ action: 'wait' }]);
+    let listenCalls = 0;
+    harness.voice.listen = vi.fn(async () => {
+      listenCalls += 1;
+      if (listenCalls === 1) {
+        return {
+          status: 'error' as const,
+          error: new Error('Microphone unavailable.'),
+        };
+      }
+      return { status: 'transcript' as const, ...initialTranscript };
+    });
+    harness.flow.start();
+
+    await expect(harness.flow.requestVoice()).resolves.toMatchObject({
+      status: 'error',
+    });
+    const recovered = await harness.flow.retry();
+
+    expect(recovered).toMatchObject({
+      status: 'completed',
+      action: { action: 'wait' },
+    });
+    expect(listenCalls).toBe(2);
+  });
+
   it('reasons again after the expected user action and keeps the loop on the new page', async () => {
     const successAction: GuideAction = {
       action: 'success',

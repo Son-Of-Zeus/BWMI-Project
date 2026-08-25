@@ -24,7 +24,7 @@ npm test -- --run companion/Companion.test.tsx companion/companion-ui.test.ts
 - the microphone remains a real keyboard-focusable button
 - the current state is available as text, not only animation or color
 - focus-mask and highlight layers remain `aria-hidden` and pointer-transparent
-- error recovery is available through the same explicit microphone control
+- recoverable failures retry through the same explicit microphone control
 
 ## Definition of Done
 

@@ -17,7 +17,8 @@ and interaction observer, reconciles the live registry, builds sanitized
 reasoning requests, runs validated guide actions, schedules the next reasoning
 pass after a matched user action or navigation, and resets the active demo
 context on request. A new voice request cancels stale work while preserving
-pending context for an explanation.
+pending context for an explanation; recoverable post-transcription failures
+retain a transient transcript for an explicit retry.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -38,6 +39,8 @@ action.
 - page changes trigger a fresh semantic snapshot
 - explanation requests preserve the existing pending workflow target
 - demo reset cancels active work, clears session context, and rescans the current page
+- recoverable reasoning or guidance failures retry without another recording
+- microphone failures fall back to a fresh voice request
 - teardown stops observers and cancels speech/guidance
 
 ## Definition of Done
