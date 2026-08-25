@@ -47,9 +47,16 @@ describe('Companion accessibility', () => {
     expect(status.textContent).toContain('Thinking…');
 
     await act(async () => {
+      store.setLatencyNotice(true);
+    });
+    expect(surface.getAttribute('data-companion-latency')).toBe('slow');
+    expect(status.textContent).toContain('Still working…');
+
+    await act(async () => {
       store.setState('error');
     });
     expect(surface.getAttribute('aria-busy')).toBe('false');
+    expect(surface.getAttribute('data-companion-latency')).toBe('normal');
     expect(button.getAttribute('aria-label')).toBe('Try voice guidance again');
     expect(status.getAttribute('aria-live')).toBe('assertive');
     expect(status.textContent).toContain('Try again');

@@ -3,6 +3,7 @@ import type { CompanionState } from '../session/session-state';
 
 export type CompanionUiSnapshot = {
   state: CompanionState;
+  latencyNotice: boolean;
   targetRect: DOMRect | null;
   focusMaskActive: boolean;
   highlightRect: DOMRect | null;
@@ -31,6 +32,7 @@ export type CompanionUiStore = GuideOverlay &
     subscribe(listener: () => void): () => void;
     setListeningHandler(handler?: () => void): void;
     setResetHandler(handler?: () => void): void;
+    setLatencyNotice(active: boolean): void;
     toggleListening(): void;
     resetDemo(): void;
     destroy(): void;
@@ -109,6 +111,7 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
 
   let snapshot: CompanionUiSnapshot = {
     state: 'idle',
+    latencyNotice: false,
     targetRect: null,
     focusMaskActive: false,
     highlightRect: null,
@@ -123,10 +126,15 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
   };
 
   const setState = (state: CompanionState) => {
-    if (state === snapshot.state) {
+    const latencyNotice =
+      state === snapshot.state ? snapshot.latencyNotice : false;
+    if (
+      state === snapshot.state &&
+      latencyNotice === snapshot.latencyNotice
+    ) {
       return;
     }
-    publish({ ...snapshot, state });
+    publish({ ...snapshot, state, latencyNotice });
   };
 
   const store: CompanionUiStore = {
@@ -149,6 +157,13 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
       resetHandler = handler;
     },
 
+    setLatencyNotice(active) {
+      if (active === snapshot.latencyNotice) {
+        return;
+      }
+      publish({ ...snapshot, latencyNotice: active });
+    },
+
     toggleListening() {
       if (listeningHandler) {
         listeningHandler();
@@ -164,6 +179,7 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
       }
 
       store.clear();
+      store.setLatencyNotice(false);
       setState('idle');
     },
 

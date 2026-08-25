@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createCompanionUiStore } from '../companion/companion-ui';
-import type { Reasoner } from '../reasoning/reasoning';
+import type { GuideAction, Reasoner } from '../reasoning/reasoning';
 import type {
   AudioPlayback,
   AudioRecorder,
@@ -23,7 +23,7 @@ function targetRect(): DOMRect {
   } as DOMRect;
 }
 
-function createHarness() {
+function createHarness(loadingLatencyNoticeMs?: number) {
   const button = document.createElement('button');
   button.textContent = 'Online Services';
   vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(targetRect());
@@ -82,6 +82,7 @@ function createHarness() {
     viewport: () => ({ width: 800, height: 600 }),
     waitForLayout: async () => undefined,
     waitForPageSettled: async () => undefined,
+    loadingLatencyNoticeMs,
   });
 
   return { button, companion, recorder, speechToText, textToSpeech, playback, reasoner, runtime, host };
@@ -138,6 +139,68 @@ describe('extension runtime', () => {
       targetRect: null,
       focusMaskActive: false,
       highlightRect: null,
+    });
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
+  it('announces slow reasoning and clears the notice when work completes', async () => {
+    const harness = createHarness(1);
+    let resolveReason!: (action: GuideAction) => void;
+    harness.reasoner.reason = vi.fn(
+      () =>
+        new Promise<GuideAction>((resolve) => {
+          resolveReason = resolve;
+        }),
+    );
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.companion.getSnapshot()).toMatchObject({
+      state: 'thinking',
+      latencyNotice: true,
+    });
+
+    resolveReason({ action: 'wait' });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.companion.getSnapshot()).toMatchObject({
+      state: 'waiting',
+      latencyNotice: false,
+    });
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
+  it('announces slow speech synthesis and clears the notice after playback', async () => {
+    const harness = createHarness(1);
+    let resolveSynthesis!: (audio: ArrayBuffer) => void;
+    harness.textToSpeech.synthesize = vi.fn(
+      () =>
+        new Promise<ArrayBuffer>((resolve) => {
+          resolveSynthesis = resolve;
+        }),
+    );
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.companion.getSnapshot()).toMatchObject({
+      state: 'speaking',
+      latencyNotice: true,
+    });
+
+    resolveSynthesis(new Uint8Array([1, 2]).buffer);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.companion.getSnapshot()).toMatchObject({
+      state: 'waiting',
+      latencyNotice: false,
     });
 
     harness.runtime.stop();

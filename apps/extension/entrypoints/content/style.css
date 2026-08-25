@@ -179,6 +179,11 @@
   white-space: nowrap;
 }
 
+.companion-surface[data-companion-latency='slow'] .companion-status {
+  border-color: rgba(180, 119, 0, 0.42);
+  background: #fff8e1;
+}
+
 @keyframes companion-pulse {
   0%,
   100% {

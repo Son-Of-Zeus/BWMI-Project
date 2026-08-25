@@ -58,7 +58,10 @@ export type ExtensionRuntimeOptions = {
   prefersReducedMotion?: () => boolean;
   waitForLayout?: () => Promise<void>;
   waitForPageSettled?: () => Promise<void>;
+  loadingLatencyNoticeMs?: number;
 };
+
+export const DEFAULT_LOADING_LATENCY_NOTICE_MS = 1200;
 
 export type ExtensionRuntime = {
   session: SessionStateStore;
@@ -79,6 +82,10 @@ function toCompanionState(state: VoiceState): CompanionState {
 
 function toCompanionPhase(phase: FlowPhase): CompanionState | undefined {
   return phase === 'stopped' ? undefined : phase;
+}
+
+function isLatencyState(state: CompanionState): boolean {
+  return state === 'thinking' || state === 'speaking';
 }
 
 export function createExtensionRuntime(
@@ -132,9 +139,48 @@ export function createExtensionRuntime(
     voice,
     waitForPageSettled: options.waitForPageSettled,
   });
+  const loadingLatencyNoticeMs = Math.max(
+    0,
+    options.loadingLatencyNoticeMs ?? DEFAULT_LOADING_LATENCY_NOTICE_MS,
+  );
 
   let unsubscribeVoice: (() => void) | undefined;
   let unsubscribeFlow: (() => void) | undefined;
+  let latencyTimer: ReturnType<typeof setTimeout> | undefined;
+  let latencyState: CompanionState | undefined;
+
+  const clearLatencyNotice = () => {
+    if (latencyTimer !== undefined) {
+      clearTimeout(latencyTimer);
+      latencyTimer = undefined;
+    }
+    latencyState = undefined;
+    options.companion.setLatencyNotice(false);
+  };
+
+  const publishCompanionState = (state: CompanionState) => {
+    options.companion.setState(state);
+    if (!isLatencyState(state)) {
+      clearLatencyNotice();
+      return;
+    }
+
+    if (latencyState === state) {
+      return;
+    }
+
+    if (latencyTimer !== undefined) {
+      clearTimeout(latencyTimer);
+    }
+    latencyState = state;
+    options.companion.setLatencyNotice(false);
+    latencyTimer = setTimeout(() => {
+      latencyTimer = undefined;
+      if (latencyState === state) {
+        options.companion.setLatencyNotice(true);
+      }
+    }, loadingLatencyNoticeMs);
+  };
 
   const handleListening = () => {
     if (voice.getState() === 'listening') {
@@ -144,6 +190,7 @@ export function createExtensionRuntime(
     void flow.requestVoice();
   };
   const handleReset = () => {
+    clearLatencyNotice();
     flow.reset();
   };
   options.companion.setListeningHandler(handleListening);
@@ -165,12 +212,12 @@ export function createExtensionRuntime(
       }
       started = true;
       unsubscribeVoice = voice.subscribe((state) => {
-        options.companion.setState(toCompanionState(state));
+        publishCompanionState(toCompanionState(state));
       });
       unsubscribeFlow = flow.subscribe((snapshot) => {
         const companionState = toCompanionPhase(snapshot.phase);
         if (companionState) {
-          options.companion.setState(companionState);
+          publishCompanionState(companionState);
         }
       });
       options.companion.setListeningHandler(handleListening);
@@ -183,6 +230,7 @@ export function createExtensionRuntime(
         return;
       }
       started = false;
+      clearLatencyNotice();
       flow.stop();
       options.companion.setListeningHandler(undefined);
       options.companion.setResetHandler(undefined);
@@ -193,6 +241,7 @@ export function createExtensionRuntime(
     },
 
     reset() {
+      clearLatencyNotice();
       flow.reset();
     },
   };

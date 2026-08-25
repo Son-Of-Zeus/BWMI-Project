@@ -39,6 +39,9 @@ export default function Companion({ store }: CompanionProps) {
   );
   const isListening = snapshot.state === 'listening';
   const isBusy = isBusyState(snapshot.state);
+  const statusLabel = snapshot.latencyNotice
+    ? 'Still working…'
+    : COMPANION_STATE_LABELS[snapshot.state];
   const viewport = {
     width: window.innerWidth,
     height: window.innerHeight,
@@ -63,6 +66,7 @@ export default function Companion({ store }: CompanionProps) {
       aria-busy={isBusy}
       data-companion-state={snapshot.state}
       data-companion-busy={isBusy}
+      data-companion-latency={snapshot.latencyNotice ? 'slow' : 'normal'}
       style={style}
     >
       <button
@@ -91,7 +95,7 @@ export default function Companion({ store }: CompanionProps) {
         aria-live={snapshot.state === 'error' ? 'assertive' : 'polite'}
         aria-atomic="true"
       >
-        {COMPANION_STATE_LABELS[snapshot.state]}
+        {statusLabel}
       </span>
     </section>
   );

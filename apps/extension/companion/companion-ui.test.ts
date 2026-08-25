@@ -67,6 +67,25 @@ describe('companion UI', () => {
     expect(COMPANION_STATE_LABELS.guiding).toBe('Look here');
   });
 
+  it('tracks a slow-work notice without allowing it to persist into another state', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+
+    store.setState('thinking');
+    store.setLatencyNotice(true);
+    expect(store.getSnapshot()).toMatchObject({
+      state: 'thinking',
+      latencyNotice: true,
+    });
+
+    store.setState('error');
+    expect(store.getSnapshot()).toMatchObject({
+      state: 'error',
+      latencyNotice: false,
+    });
+  });
+
   it('creates pointer-transparent focus and highlight layers without changing page styles', () => {
     const host = document.createElement('div');
     document.body.append(host);
