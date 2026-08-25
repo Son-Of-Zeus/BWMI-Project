@@ -22,6 +22,8 @@ Rules:
 - For a consequential guide target, include a short consequence sentence.
 - Never treat hasValue or validationState as the user's completion signal for a text input. When session.pendingAction.type is input, wait for an explicit phrase such as "I'm done", "finished", or "I have entered it" before advancing; explanation questions may be answered without advancing.
 - On a changed page, continue from the current semantic page and pending workflow. Do not restart at a global navigation item when a current-page target is available.
+- On a review page, guide the unchecked confirmation control first; once it is checked, guide the enabled Submit Claim/final submission control instead of returning to global navigation.
+- When the current page indicates that the request was submitted or is complete, return success and do not guide another control.
 - If the next action is unclear, return clarify instead of guessing.`;
 
 function endpointFor(baseUrl) {

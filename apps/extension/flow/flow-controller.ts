@@ -343,7 +343,7 @@ export function createFlowController(
   };
 
   const scheduleContinuation = () => {
-    if (!started || !snapshot.lastTranscript) {
+    if (!started || snapshot.phase === 'success' || !snapshot.lastTranscript) {
       return;
     }
     clearContinuation();
@@ -354,6 +354,10 @@ export function createFlowController(
   };
 
   const handleInteraction = (event: InteractionEvent) => {
+    if (snapshot.phase === 'success') {
+      return;
+    }
+
     if (event.type === 'navigation') {
       options.guide.cancel();
       scheduleContinuation();

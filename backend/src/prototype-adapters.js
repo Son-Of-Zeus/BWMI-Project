@@ -272,8 +272,23 @@ export function createPrototypeReasoner() {
           /\b(?:confirm|reviewed).*\bsubmit\b/i,
           new Set(['checkbox']),
         );
-        if (confirmationTarget && confirmationTarget.hasValue !== true) {
-          return guideTarget(confirmationTarget, language);
+        if (confirmationTarget) {
+          if (confirmationTarget.hasValue !== true) {
+            return guideTarget(confirmationTarget, language);
+          }
+
+          const submitTarget = findTarget(
+            request.page.elements,
+            /\b(?:submit|finalize|send|file)\b/i,
+            CLICK_ROLES,
+          );
+          if (submitTarget) {
+            return guideTarget(submitTarget, language);
+          }
+
+          // Stay on the review step when its final control is not currently
+          // available; never fall back to a global navigation target.
+          return { action: 'wait' };
         }
 
         const onlineServices = findTarget(

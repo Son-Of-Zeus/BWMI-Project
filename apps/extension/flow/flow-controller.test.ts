@@ -341,6 +341,18 @@ describe('PF flow controller', () => {
       phase: 'success',
       lastAction: successAction,
     });
+
+    harness.interactions.emit({
+      type: 'navigation',
+      url: 'http://localhost:5173/claims/success',
+      previousUrl: 'http://localhost:5173/claims/review',
+      reason: 'push-state',
+      timestamp: 2,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(2);
+    expect(harness.flow.getSnapshot().phase).toBe('success');
   });
 
   it('recovers after an unexpected action while preserving the pending workflow', async () => {

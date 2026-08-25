@@ -22,6 +22,8 @@ status events do not advance the workflow; a voice completion phrase is
 required. A new voice request cancels stale work while preserving pending context for an explanation;
 recoverable post-transcription failures
 retain a transient transcript for an explicit retry.
+When reasoning returns `success`, automatic continuation becomes terminal so a
+later navigation event cannot restart the completed journey.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -40,6 +42,7 @@ action.
 
 - stale asynchronous reasoning results are ignored
 - page changes trigger a fresh semantic snapshot
+- a completed success page clears guidance and does not trigger another target
 - explanation requests preserve the existing pending workflow target
 - demo reset cancels active work, clears session context, and rescans the current page
 - recoverable reasoning or guidance failures retry without another recording

@@ -454,6 +454,38 @@ test('prototype reasoner advances through the fictional claim journey', async ()
       recentActions: [{ type: 'click', label: 'I confirm that I have reviewed the details and want to submit this claim.' }],
       elements: [
         {
+          id: 'el_online_services_review',
+          role: 'button',
+          label: 'Online Services',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+        {
+          id: 'el_confirm',
+          role: 'checkbox',
+          label: 'I confirm that I have reviewed the details and want to submit this claim.',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+          hasValue: true,
+        },
+        {
+          id: 'el_submit',
+          role: 'button',
+          label: 'Submit Claim',
+          visible: true,
+          inViewport: true,
+          disabled: false,
+        },
+      ],
+      targetId: 'el_submit',
+      expectedUserAction: 'click',
+    },
+    {
+      recentActions: [{ type: 'click', label: 'Submit Claim' }],
+      elements: [
+        {
           id: 'el_success',
           role: 'interactive',
           label: 'Your claim request has been submitted.',
@@ -486,6 +518,9 @@ test('prototype reasoner advances through the fictional claim journey', async ()
     } else {
       assert.equal(action.targetId, step.targetId);
       assert.equal(action.expectedUserAction, step.expectedUserAction);
+      if (step.targetId === 'el_submit') {
+        assert.match(action.consequence, /request submit/i);
+      }
     }
   }
 });
