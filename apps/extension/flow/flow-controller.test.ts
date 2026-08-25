@@ -298,6 +298,46 @@ describe('PF flow controller', () => {
     });
   });
 
+  it('recovers after an unexpected action while preserving the pending workflow', async () => {
+    const harness = createHarness([guideAction, { action: 'wait' }]);
+    harness.flow.start();
+    await harness.flow.requestVoice();
+
+    const unexpectedButton = document.createElement('button');
+    unexpectedButton.textContent = 'Claim Status';
+    document.body.append(unexpectedButton);
+    harness.scanner.emit();
+
+    harness.interactions.emit({
+      type: 'click',
+      action: 'click',
+      targetId: 'el_2',
+      label: 'Claim Status',
+      matchedPending: false,
+      timestamp: 2,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(2);
+    expect(harness.reasoner.reason).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        session: expect.objectContaining({
+          pendingAction: {
+            type: 'click',
+            targetLabel: 'Online Services',
+          },
+        }),
+      }),
+    );
+    expect(harness.guide.cancel).toHaveBeenLastCalledWith({
+      preservePendingAction: true,
+    });
+    expect(harness.session.getState()).toMatchObject({
+      pendingAction: { targetId: 'el_1', expectedUserAction: 'click' },
+    });
+    expect(harness.flow.getSnapshot().phase).toBe('waiting');
+  });
+
   it('preserves pending workflow context for a voice explanation interruption', async () => {
     const explainAction: GuideAction = {
       action: 'explain',

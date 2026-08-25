@@ -15,9 +15,11 @@ The controller coordinates the journey without executing website actions.
 `apps/extension/flow/flow-controller.ts` starts and stops the semantic scanner
 and interaction observer, reconciles the live registry, builds sanitized
 reasoning requests, runs validated guide actions, schedules the next reasoning
-pass after a matched user action or navigation, and resets the active demo
-context on request. A new voice request cancels stale work while preserving
-pending context for an explanation; recoverable post-transcription failures
+pass after a matched user action, an unmatched semantic action, or navigation,
+and resets the active demo context on request. An unmatched action clears stale
+guidance while preserving the pending workflow for reconsideration. A new voice
+request cancels stale work while preserving pending context for an explanation;
+recoverable post-transcription failures
 retain a transient transcript for an explicit retry.
 
 Run the focused tests from `apps/extension/` with:

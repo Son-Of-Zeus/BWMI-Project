@@ -286,10 +286,20 @@ export function createFlowController(
   };
 
   const handleInteraction = (event: InteractionEvent) => {
-    if (
-      event.type === 'navigation' ||
-      ('matchedPending' in event && event.matchedPending)
-    ) {
+    if (event.type === 'navigation') {
+      options.guide.cancel();
+      scheduleContinuation();
+      return;
+    }
+
+    if (event.matchedPending) {
+      options.guide.cancel();
+      scheduleContinuation();
+      return;
+    }
+
+    if (options.session.getState().pendingAction) {
+      options.guide.cancel({ preservePendingAction: true });
       scheduleContinuation();
     }
   };

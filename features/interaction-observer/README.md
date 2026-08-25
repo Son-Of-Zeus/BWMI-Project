@@ -8,7 +8,7 @@ The assistant guides; the user acts.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/interaction/interaction-observer.ts`. It resolves nested event targets through the element registry, matches actions against pending session state, records only semantic action metadata, reports high-level input/select status without values, observes SPA history/navigation, and never prevents the website's own events.
+The extension implementation lives in `apps/extension/interaction/interaction-observer.ts`. It resolves nested event targets through the element registry, matches actions against pending session state, records only semantic action metadata, reports high-level input/select status without values, observes SPA history/navigation, and never prevents the website's own events. The flow controller consumes unmatched semantic actions to recover against the current page without discarding the active goal.
 
 Run the focused tests from `apps/extension/` with:
 
