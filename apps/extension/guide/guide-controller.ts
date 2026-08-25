@@ -47,7 +47,7 @@ export type GuideResult =
 
 export type GuideController = {
   run(action: GuideAction): Promise<GuideResult>;
-  cancel(): void;
+  cancel(options?: { preservePendingAction?: boolean }): void;
 };
 
 type PreparedTarget =
@@ -341,8 +341,8 @@ export function createGuideController(
       return { status: 'guided', targetId: prepared.entry.id };
     },
 
-    cancel() {
-      cancelInternal(false);
+    cancel(options) {
+      cancelInternal(options?.preservePendingAction ?? false);
     },
   };
 }

@@ -269,4 +269,19 @@ describe('guide controller', () => {
       companionState: 'idle',
     });
   });
+
+  it('can cancel an explanation interruption while preserving the current pending action', () => {
+    const harness = createHarness();
+    harness.session.setPendingAction({
+      targetId: 'el_1',
+      expectedUserAction: 'click',
+    });
+
+    harness.controller.cancel({ preservePendingAction: true });
+
+    expect(harness.session.getState()).toMatchObject({
+      pendingAction: { targetId: 'el_1', expectedUserAction: 'click' },
+      companionState: 'idle',
+    });
+  });
 });
