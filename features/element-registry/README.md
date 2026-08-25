@@ -6,6 +6,16 @@ Maintain the mapping between model-visible semantic IDs and actual live DOM elem
 
 The registry is the bridge between reasoning and visual guidance.
 
+## Current Implementation
+
+The extension implementation lives in `apps/extension/registry/element-registry.ts`. It uses a `WeakMap<HTMLElement, string>` for runtime IDs, reconciles discovered elements without persisting coordinates, exposes `getLive()` for stale-target checks, and strips DOM references from `snapshot()` output.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npx vitest run registry/element-registry.test.ts
+```
+
 ## Internal Entry
 
 ```ts
