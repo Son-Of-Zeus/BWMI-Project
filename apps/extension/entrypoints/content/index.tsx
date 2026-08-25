@@ -1,5 +1,6 @@
 import ReactDOM from 'react-dom/client';
 import './style.css';
+import { createCompanionUiStore } from '../../companion/companion-ui';
 import App from './App';
 
 const mockPortalMatches = ['http://localhost/*', 'http://127.0.0.1/*'];
@@ -19,12 +20,17 @@ export default defineContentScript({
         app.dataset.voiceCompanionApp = 'true';
         container.append(app);
 
-        const root = ReactDOM.createRoot(app);
-        root.render(<App />);
-        return root;
+        const store = createCompanionUiStore(app);
+        const reactMount = document.createElement('div');
+        app.append(reactMount);
+
+        const root = ReactDOM.createRoot(reactMount);
+        root.render(<App store={store} />);
+        return { root, store };
       },
-      onRemove(root) {
-        root?.unmount();
+      onRemove(mounted) {
+        mounted?.root.unmount();
+        mounted?.store.destroy();
       },
     });
 

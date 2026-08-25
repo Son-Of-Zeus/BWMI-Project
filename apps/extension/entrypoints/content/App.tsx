@@ -1,25 +1,10 @@
-import { useState } from 'react';
+import Companion from '../../companion/Companion';
+import type { CompanionUiStore } from '../../companion/companion-ui';
 
-type ShellState = 'idle' | 'listening';
+type AppProps = {
+  store: CompanionUiStore;
+};
 
-export default function App() {
-  const [state, setState] = useState<ShellState>('idle');
-  const isListening = state === 'listening';
-
-  return (
-    <section className="voice-companion-shell" aria-label="Voice companion">
-      <button
-        className={`voice-button${isListening ? ' voice-button--listening' : ''}`}
-        type="button"
-        aria-label={isListening ? 'Stop listening' : 'Start voice guidance'}
-        aria-pressed={isListening}
-        onClick={() => setState(isListening ? 'idle' : 'listening')}
-      >
-        <span className="voice-orb" aria-hidden="true" />
-      </button>
-      <span className="voice-status" aria-live="polite">
-        {isListening ? 'Listening…' : 'Voice guidance'}
-      </span>
-    </section>
-  );
+export default function App({ store }: AppProps) {
+  return <Companion store={store} />;
 }

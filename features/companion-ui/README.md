@@ -6,6 +6,16 @@ Create the feeling of a knowledgeable person sitting beside the user and pointin
 
 The companion is not the mouse pointer and must never replace the system cursor.
 
+## Current Implementation
+
+The extension implementation lives in `apps/extension/companion/`. `Companion.tsx` renders the eight required states through an external UI store, while `companion-ui.ts` provides fixed-position focus-mask and highlight layers plus guide-controller adapters. Overlay layers use `pointer-events: none`, and position/motion helpers clamp the companion to the viewport and respect reduced motion.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npx vitest run companion/companion-ui.test.ts
+```
+
 ## Required States
 
 ```text
