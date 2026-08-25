@@ -67,6 +67,22 @@ describe('DOM semantic layer', () => {
     });
   });
 
+  it('excludes non-interactive landmark roles from model context', () => {
+    document.body.innerHTML = `
+      <div role="banner">Header</div>
+      <nav role="navigation">Navigation</nav>
+      <main role="main">
+        <button>Online Services</button>
+        <div role="status">Member verified</div>
+      </main>
+      <footer role="contentinfo">Footer</footer>
+    `;
+
+    expect(discoverSemanticElements(document).map(({ role, label }) => ({ role, label }))).toEqual([
+      { role: 'button', label: 'Online Services' },
+    ]);
+  });
+
   it('keeps visibility separate from viewport position and filters hidden controls', () => {
     document.body.innerHTML = `
       <button id="above">Above</button>

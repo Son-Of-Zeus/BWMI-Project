@@ -12,6 +12,17 @@ export const CANDIDATE_SELECTOR = [
 
 const MAX_LABEL_LENGTH = 160;
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6';
+const SUPPORTED_SEMANTIC_ROLES = new Set([
+  'button',
+  'link',
+  'textbox',
+  'checkbox',
+  'radio',
+  'combobox',
+  'menuitem',
+  'tab',
+  'interactive',
+]);
 
 export type ValidationState = 'unknown' | 'valid' | 'invalid';
 
@@ -386,7 +397,8 @@ export function discoverSemanticElements(
         validationState: controlState.validationState,
         element,
       } satisfies DiscoveredElement;
-    });
+    })
+    .filter((entry) => SUPPORTED_SEMANTIC_ROLES.has(entry.role));
 }
 
 export function toSafeSemanticElement(
