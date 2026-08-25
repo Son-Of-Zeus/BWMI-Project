@@ -293,6 +293,48 @@ describe('PF flow controller', () => {
     expect(harness.flow.getSnapshot().phase).toBe('idle');
   });
 
+  it('resets the workflow, cancels active services, and rescans the current page', async () => {
+    const harness = createHarness([guideAction]);
+    harness.flow.start();
+    await harness.flow.requestVoice();
+    harness.session.recordAction({ type: 'click', label: 'Online Services' });
+
+    harness.flow.reset();
+
+    expect(harness.guide.cancel).toHaveBeenCalled();
+    expect(harness.voice.cancel).toHaveBeenCalled();
+    expect(harness.session.getState()).toEqual({
+      recentActions: [],
+      companionState: 'idle',
+    });
+    expect(harness.flow.getSnapshot().phase).toBe('idle');
+    expect(harness.flow.getSnapshot().page).not.toBeNull();
+    expect(harness.flow.getSnapshot().lastTranscript).toBeUndefined();
+    expect(harness.flow.getSnapshot().lastAction).toBeUndefined();
+    expect(harness.flow.getSnapshot().error).toBeUndefined();
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a late voice result after demo reset', async () => {
+    let resolveVoice!: (result: VoiceResult) => void;
+    const harness = createHarness([guideAction]);
+    harness.voice.listen = vi.fn(
+      () =>
+        new Promise<VoiceResult>((resolve) => {
+          resolveVoice = resolve;
+        }),
+    );
+    harness.flow.start();
+
+    const pending = harness.flow.requestVoice();
+    harness.flow.reset();
+    resolveVoice({ status: 'transcript', ...initialTranscript });
+
+    await expect(pending).resolves.toEqual({ status: 'cancelled' });
+    expect(harness.reasoner.reason).not.toHaveBeenCalled();
+    expect(harness.flow.getSnapshot().phase).toBe('idle');
+  });
+
   it('stops all observers and cancels active work on teardown', () => {
     const harness = createHarness([]);
     harness.flow.start();

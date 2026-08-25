@@ -30,7 +30,9 @@ export type CompanionUiStore = GuideOverlay &
     getSnapshot(): CompanionUiSnapshot;
     subscribe(listener: () => void): () => void;
     setListeningHandler(handler?: () => void): void;
+    setResetHandler(handler?: () => void): void;
     toggleListening(): void;
+    resetDemo(): void;
     destroy(): void;
   };
 
@@ -113,6 +115,7 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
   };
   const listeners = new Set<() => void>();
   let listeningHandler: (() => void) | undefined;
+  let resetHandler: (() => void) | undefined;
 
   const publish = (nextSnapshot: CompanionUiSnapshot) => {
     snapshot = nextSnapshot;
@@ -142,12 +145,26 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
       listeningHandler = handler;
     },
 
+    setResetHandler(handler) {
+      resetHandler = handler;
+    },
+
     toggleListening() {
       if (listeningHandler) {
         listeningHandler();
         return;
       }
       setState(snapshot.state === 'listening' ? 'idle' : 'listening');
+    },
+
+    resetDemo() {
+      if (resetHandler) {
+        resetHandler();
+        return;
+      }
+
+      store.clear();
+      setState('idle');
     },
 
     setTarget(rect) {
@@ -182,6 +199,7 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
 
     destroy() {
       listeningHandler = undefined;
+      resetHandler = undefined;
       focusMask.remove();
       highlight.remove();
       listeners.clear();

@@ -1,6 +1,6 @@
 import { act } from 'react';
 import ReactDOM from 'react-dom/client';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import Companion, {
   COMPANION_STATUS_ID,
   getCompanionButtonLabel,
@@ -54,6 +54,34 @@ describe('Companion accessibility', () => {
     expect(status.getAttribute('aria-live')).toBe('assertive');
     expect(status.textContent).toContain('Try again');
 
+    root.unmount();
+    store.destroy();
+  });
+
+  it('renders an accessible demo-reset control and delegates the action', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+    const resetHandler = vi.fn();
+    store.setResetHandler(resetHandler);
+    const reactMount = document.createElement('div');
+    host.append(reactMount);
+    const root = ReactDOM.createRoot(reactMount);
+
+    await act(async () => {
+      root.render(<Companion store={store} />);
+    });
+
+    const resetButton = host.querySelector(
+      'button[aria-label="Reset demo"]',
+    ) as HTMLButtonElement;
+    expect(resetButton.getAttribute('title')).toBe('Reset demo');
+
+    await act(async () => {
+      resetButton.click();
+    });
+
+    expect(resetHandler).toHaveBeenCalledTimes(1);
     root.unmount();
     store.destroy();
   });

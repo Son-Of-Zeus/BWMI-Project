@@ -75,6 +75,15 @@ export default function Companion({ store }: CompanionProps) {
       >
         <span className="companion-orb" aria-hidden="true" />
       </button>
+      <button
+        className="companion-reset"
+        type="button"
+        aria-label="Reset demo"
+        title="Reset demo"
+        onClick={() => store.resetDemo()}
+      >
+        <span aria-hidden="true">↺</span>
+      </button>
       <span
         className="companion-status"
         id={COMPANION_STATUS_ID}

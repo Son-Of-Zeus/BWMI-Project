@@ -116,6 +116,34 @@ describe('extension runtime', () => {
     });
   });
 
+  it('resets extension state through the companion demo control', async () => {
+    const harness = createHarness();
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(harness.companion.getSnapshot().state).toBe('waiting');
+
+    harness.companion.resetDemo();
+
+    expect(harness.runtime.session.getState()).toEqual({
+      recentActions: [],
+      companionState: 'idle',
+    });
+    expect(harness.runtime.flow.getSnapshot().phase).toBe('idle');
+    expect(harness.runtime.flow.getSnapshot().lastTranscript).toBeUndefined();
+    expect(harness.runtime.flow.getSnapshot().lastAction).toBeUndefined();
+    expect(harness.companion.getSnapshot()).toMatchObject({
+      state: 'idle',
+      targetRect: null,
+      focusMaskActive: false,
+      highlightRect: null,
+    });
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
   it('stops scanners, observers, and microphone wiring during teardown', () => {
     const harness = createHarness();
     harness.runtime.start();

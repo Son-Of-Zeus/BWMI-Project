@@ -70,6 +70,7 @@ export type ExtensionRuntime = {
   flow: FlowController;
   start(): void;
   stop(): void;
+  reset(): void;
 };
 
 function toCompanionState(state: VoiceState): CompanionState {
@@ -142,7 +143,11 @@ export function createExtensionRuntime(
     }
     void flow.requestVoice();
   };
+  const handleReset = () => {
+    flow.reset();
+  };
   options.companion.setListeningHandler(handleListening);
+  options.companion.setResetHandler(handleReset);
 
   let started = false;
   return {
@@ -169,6 +174,7 @@ export function createExtensionRuntime(
         }
       });
       options.companion.setListeningHandler(handleListening);
+      options.companion.setResetHandler(handleReset);
       flow.start();
     },
 
@@ -179,10 +185,15 @@ export function createExtensionRuntime(
       started = false;
       flow.stop();
       options.companion.setListeningHandler(undefined);
+      options.companion.setResetHandler(undefined);
       unsubscribeVoice?.();
       unsubscribeFlow?.();
       unsubscribeVoice = undefined;
       unsubscribeFlow = undefined;
+    },
+
+    reset() {
+      flow.reset();
     },
   };
 }

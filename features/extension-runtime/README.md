@@ -9,9 +9,10 @@ the companion a clean lifecycle.
 
 `apps/extension/runtime/extension-runtime.ts` constructs the scanner, registry,
 session, interaction observer, voice controller, guide controller, and PF flow
-controller. It binds the companion microphone to `requestVoice()`, maps runtime
-states into the UI, and accepts injected adapters for deterministic tests or a
-different backend deployment.
+controller. It binds the companion microphone to `requestVoice()`, binds the
+demo-reset control to the flow reset boundary, maps runtime states into the UI,
+and accepts injected adapters for deterministic tests or a different backend
+deployment.
 
 `entrypoints/content/index.tsx` starts the runtime when the Shadow DOM mounts
 and stops it before teardown. Reasoning defaults to `/reason`, speech defaults

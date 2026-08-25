@@ -131,4 +131,34 @@ describe('companion UI', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot().state).toBe('idle');
   });
+
+  it('resets local presentation state when no runtime handler is attached', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+
+    store.setState('waiting');
+    store.activateFocusMask();
+    store.highlight(rect(20, 80));
+    store.resetDemo();
+
+    expect(store.getSnapshot()).toMatchObject({
+      state: 'idle',
+      focusMaskActive: false,
+      targetRect: null,
+      highlightRect: null,
+    });
+  });
+
+  it('delegates demo reset to the runtime when a reset handler is attached', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+    const handler = vi.fn();
+    store.setResetHandler(handler);
+
+    store.resetDemo();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
 });

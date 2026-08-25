@@ -68,6 +68,7 @@ export type FlowController = {
   subscribe(listener: (snapshot: FlowSnapshot) => void): () => void;
   start(): void;
   stop(): void;
+  reset(): void;
   refresh(): ReasoningPage;
   requestVoice(): Promise<FlowResult>;
   cancel(): void;
@@ -288,6 +289,23 @@ export function createFlowController(
     setPhase(started ? 'idle' : 'stopped');
   };
 
+  const reset = () => {
+    beginRun();
+    options.guide.cancel();
+    options.voice.cancel();
+    options.session.reset();
+    options.registry.clear();
+
+    if (!started) {
+      publish({ phase: 'stopped', page: null });
+      return;
+    }
+
+    publish({ phase: 'idle', page: null });
+    refresh();
+    setPhase('idle');
+  };
+
   return {
     getSnapshot() {
       return {
@@ -340,6 +358,8 @@ export function createFlowController(
       options.voice.cancel();
       setPhase('stopped');
     },
+
+    reset,
 
     refresh,
 

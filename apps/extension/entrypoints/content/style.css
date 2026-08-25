@@ -69,8 +69,35 @@
   outline-offset: 3px;
 }
 
+.companion-reset {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(23, 32, 51, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #172033;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.companion-reset:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(23, 32, 51, 0.16);
+}
+
+.companion-reset:focus-visible {
+  outline: 3px solid #f4bf4f;
+  outline-offset: 3px;
+}
+
 @media (prefers-contrast: more) {
-  .companion-button {
+  .companion-button,
+  .companion-reset {
     border: 2px solid #111827;
   }
 
@@ -87,13 +114,15 @@
 }
 
 @media (forced-colors: active) {
-  .companion-button {
+  .companion-button,
+  .companion-reset {
     border: 2px solid ButtonText;
     color: ButtonText;
     background: ButtonFace;
   }
 
-  .companion-button:focus-visible {
+  .companion-button:focus-visible,
+  .companion-reset:focus-visible {
     outline-color: Highlight;
   }
 
@@ -167,7 +196,8 @@
   .companion-focus-mask,
   .companion-highlight,
   .companion-surface,
-  .companion-button {
+  .companion-button,
+  .companion-reset {
     transition: none;
   }
 

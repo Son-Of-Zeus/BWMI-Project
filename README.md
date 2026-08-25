@@ -68,7 +68,9 @@ project/
     │   └── README.md
     ├── extension-runtime/
     │   └── README.md
-    └── accessibility/
+    ├── accessibility/
+    │   └── README.md
+    └── demo-reset/
         └── README.md
 ```
 
