@@ -233,6 +233,7 @@ export function createFlowController(
       const action = await options.reasoner.reason(
         buildReasonRequest({
           userUtterance: transcript.transcript,
+          language: transcript.language,
           session: options.session.getState(),
           page,
         }),

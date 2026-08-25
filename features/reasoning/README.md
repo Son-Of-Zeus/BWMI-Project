@@ -10,7 +10,7 @@ It does not manipulate the browser.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them.
+The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -25,6 +25,7 @@ A reasoning request should contain only the minimum context required:
 ```ts
 type ReasonRequest = {
   userUtterance: string;
+  userLanguage?: string;
   session: {
     goal?: string;
     recentActions: Array<{
@@ -108,6 +109,7 @@ Use a second short sentence only when explanation or consequence is necessary.
 
 ## Same-Language Behavior
 
+The flow passes the detected speech language as `userLanguage` when available.
 The model should reply in the same practical language style as the user:
 
 - Hindi → natural Hindi

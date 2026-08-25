@@ -12,6 +12,7 @@ import {
 
 export type ReasonRequest = {
   userUtterance: string;
+  userLanguage?: string;
   session: {
     goal?: string;
     recentActions: Array<{
@@ -299,6 +300,11 @@ export function sanitizeReasonRequest(request: ReasonRequest): ReasonRequest {
     userUtterance: redactSensitiveText(
       requireString(request.userUtterance, 'userUtterance'),
     ),
+    ...(request.userLanguage !== undefined
+      ? {
+          userLanguage: requireString(request.userLanguage, 'userLanguage', 24),
+        }
+      : {}),
     session: {
       recentActions: request.session.recentActions.map((action) => ({
         type: requireString(action.type, 'session.recentActions.type', 40),
@@ -359,6 +365,7 @@ export function sanitizeReasonRequest(request: ReasonRequest): ReasonRequest {
 
 export function buildReasonRequest(input: {
   userUtterance: string;
+  language?: string;
   session: SessionState;
   page: ReasoningPage;
 }): ReasonRequest {
@@ -371,6 +378,7 @@ export function buildReasonRequest(input: {
 
   return sanitizeReasonRequest({
     userUtterance: input.userUtterance,
+    userLanguage: input.language,
     session: {
       goal: input.session.goal,
       recentActions: input.session.recentActions.map(({ type, label }) => ({

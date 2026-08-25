@@ -43,6 +43,7 @@ describe('reasoning boundary', () => {
 
     const request = buildReasonRequest({
       userUtterance: ' Mujhe PF ka paisa nikalna hai ',
+      language: 'hi-IN',
       session: session.getState(),
       page: {
         page: { title: 'Member Dashboard', section: 'Services' },
@@ -52,6 +53,7 @@ describe('reasoning boundary', () => {
 
     expect(request).toEqual({
       userUtterance: 'Mujhe PF ka paisa nikalna hai',
+      userLanguage: 'hi-IN',
       session: {
         goal: 'PF withdrawal',
         recentActions: [{ type: 'click', label: 'Previous' }],
@@ -65,6 +67,30 @@ describe('reasoning boundary', () => {
     });
     expect(JSON.stringify(request)).not.toContain('timestamp');
     expect(JSON.stringify(request)).not.toContain('"element":');
+  });
+
+  it('omits the language hint when speech recognition provides none', () => {
+    const request = buildReasonRequest({
+      userUtterance: 'Help me with my claim',
+      session: createSessionState().getState(),
+      page: {
+        page: { title: 'Member Dashboard' },
+        elements,
+      },
+    });
+
+    expect(request).not.toHaveProperty('userLanguage');
+  });
+
+  it('validates the language hint without exposing an unbounded request field', () => {
+    expect(() =>
+      sanitizeReasonRequest({
+        userUtterance: 'Help',
+        userLanguage: 'x'.repeat(25),
+        session: { recentActions: [] },
+        page: { elements: [] },
+      }),
+    ).toThrow(/userLanguage exceeds its maximum length/);
   });
 
   it('accepts valid target actions and rejects unknown targets or extra fields', () => {

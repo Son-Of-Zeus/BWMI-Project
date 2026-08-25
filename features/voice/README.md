@@ -37,7 +37,7 @@ The rest of the extension should depend on these interfaces rather than Sarvam-s
 `apps/extension/voice/voice.ts` provides the provider-neutral controller and
 adapters. The controller owns `listening`, `transcribing`, `thinking`, and
 speech states, cancels stale recordings or playback, and forwards detected
-language to text-to-speech. The shared companion state has no separate
+language to reasoning and text-to-speech. The shared companion state has no separate
 `transcribing` value, so that state is presented as `thinking` at the UI
 boundary.
 

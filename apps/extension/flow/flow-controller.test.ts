@@ -174,6 +174,7 @@ describe('PF flow controller', () => {
     expect(harness.reasoner.reason).toHaveBeenCalledWith(
       expect.objectContaining({
         userUtterance: initialTranscript.transcript,
+        userLanguage: initialTranscript.language,
         page: expect.objectContaining({
           title: 'Member Dashboard',
           elements: [expect.objectContaining({ id: 'el_1', label: 'Online Services' })],
