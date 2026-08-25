@@ -1,0 +1,80 @@
+# Safety and User-Control Boundaries
+
+## Principle
+
+The assistant guides the user. It does not take control of consequential actions.
+
+## User Must Act Manually
+
+The extension must not automatically:
+
+- submit forms
+- accept terms
+- provide consent
+- initiate financial actions
+- confirm applications
+- change personal information
+- change bank details
+- approve identity verification
+- enter OTPs
+- solve CAPTCHAs
+
+The assistant may point to these controls and explain the consequence.
+
+## Safe Navigation
+
+The extension may automate low-risk navigation aids such as:
+
+- scrolling a target into view
+- moving its own companion
+- focusing visual attention
+
+Whether to programmatically expand non-consequential menus can be evaluated later. For MVP, prefer the user clicking menus themselves.
+
+## Data Minimization
+
+Do not send raw sensitive form values to the LLM by default.
+
+Examples to keep local:
+
+- Aadhaar
+- UAN
+- phone number
+- bank account
+- IFSC
+- address
+- OTP
+- password
+
+Expose only the minimum semantic state:
+
+```json
+{
+  "label": "UAN",
+  "hasValue": true,
+  "validationState": "valid"
+}
+```
+
+## Model Response Validation
+
+Reject responses when:
+
+- action type is unknown
+- target does not exist
+- target is stale
+- required fields are missing
+- model tries to provide executable code
+- model requests autonomous consequential action
+
+## Consequence Explanation
+
+Before a final action, the spoken instruction should explain what the click will do.
+
+Example:
+
+> Isse aapki claim request submit ho jayegi. Details sahi hain to Submit Claim par khud click kariye.
+
+## Definition of Done
+
+No LLM output can cause a consequential website action without an explicit user interaction.
