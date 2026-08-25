@@ -78,7 +78,9 @@ project/
     │   └── README.md
     ├── movement-timing/
     │   └── README.md
-    └── focus-mask/
+    ├── focus-mask/
+    │   └── README.md
+    └── development-diagnostics/
         └── README.md
 ```
 

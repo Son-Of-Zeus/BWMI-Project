@@ -15,7 +15,9 @@ announces slow reasoning or speech after a bounded latency threshold, and
 routes an error-state microphone press to transcript-aware flow retry. It
 accepts injected adapters for deterministic tests or a different backend
 deployment; the guide defaults to the companion's 220ms movement timing while
-allowing tests and deployments to inject a deterministic wait.
+allowing tests and deployments to inject a deterministic wait. An explicit
+development flag selects mock transcript/reasoner adapters, while a separate
+debug flag emits safe semantic snapshots and target rectangles.
 
 `entrypoints/content/index.tsx` starts the runtime when the Shadow DOM mounts
 and stops it before teardown. Reasoning defaults to `/reason`, speech defaults

@@ -61,6 +61,7 @@ export type FlowControllerOptions = {
   guide: GuideController;
   voice: VoiceController;
   waitForPageSettled?: () => Promise<void>;
+  onPageSnapshot?: (page: ReasoningPage) => void;
   onError?: (error: Error) => void;
 };
 
@@ -150,6 +151,7 @@ export function createFlowController(
     const semanticSnapshot = options.scanner.scan();
     options.registry.reconcile(discoverSemanticElements(documentNode));
     const page = pageFromSnapshot(semanticSnapshot, options.registry);
+    options.onPageSnapshot?.(page);
     publish({ ...snapshot, page });
     return page;
   };

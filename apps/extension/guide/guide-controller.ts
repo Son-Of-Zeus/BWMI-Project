@@ -37,6 +37,7 @@ export type GuideControllerOptions = {
   prefersReducedMotion?: () => boolean;
   waitForLayout?: () => Promise<void>;
   waitForMovement?: () => Promise<void>;
+  onTargetRect?: (targetId: string, rect: DOMRect) => void;
   onMissingTarget?: (targetId: string) => void;
 };
 
@@ -186,6 +187,7 @@ export function createGuideController(
       }
 
       const rect = entry.element.getBoundingClientRect();
+      options.onTargetRect?.(entry.id, rect);
       options.overlay.activateFocusMask(rect);
       options.overlay.highlight(rect);
       options.companion.setTarget(rect);
@@ -243,6 +245,7 @@ export function createGuideController(
 
     const rect = entry.element.getBoundingClientRect();
     if (present) {
+      options.onTargetRect?.(entry.id, rect);
       options.overlay.activateFocusMask(rect);
       options.overlay.highlight(rect);
       options.companion.setTarget(rect);

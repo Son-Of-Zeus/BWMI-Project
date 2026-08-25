@@ -127,14 +127,11 @@ No provider API keys live in the extension bundle.
 
 ## Dev Mode
 
-Provide a development flag for:
-
-- mocked transcript
-- mocked reasoner
-- semantic snapshot logging
-- target box debugging
-
-These are development tools, not demo UX.
+Pass `development: { enabled: true }` to use injected development transcripts
+and a mock reasoner, and pass `debug: { enabled: true }` to opt into safe
+semantic-snapshot and target-box diagnostics. Debug events contain model-safe
+semantic data and numeric rectangles only; neither mode is enabled by default
+or presented as demo UX.
 
 ## Definition of Done
 

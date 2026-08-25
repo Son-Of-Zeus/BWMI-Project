@@ -7,7 +7,12 @@ import type {
   SpeechToText,
   TextToSpeech,
 } from '../voice/voice';
-import { createExtensionRuntime } from './extension-runtime';
+import {
+  createExtensionRuntime,
+  type ExtensionDebugEvent,
+  type ExtensionDebugOptions,
+  type ExtensionDevelopmentOptions,
+} from './extension-runtime';
 
 function targetRect(): DOMRect {
   return {
@@ -23,7 +28,11 @@ function targetRect(): DOMRect {
   } as DOMRect;
 }
 
-function createHarness(loadingLatencyNoticeMs?: number) {
+function createHarness(
+  loadingLatencyNoticeMs?: number,
+  debug?: ExtensionDebugOptions,
+  development?: ExtensionDevelopmentOptions,
+) {
   const button = document.createElement('button');
   button.textContent = 'Online Services';
   vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(targetRect());
@@ -74,9 +83,9 @@ function createHarness(loadingLatencyNoticeMs?: number) {
   const runtime = createExtensionRuntime({
     document,
     companion,
-    reasoner,
+    reasoner: development ? undefined : reasoner,
     recorder,
-    speechToText,
+    speechToText: development ? undefined : speechToText,
     textToSpeech,
     playback,
     viewport: () => ({ width: 800, height: 600 }),
@@ -84,6 +93,8 @@ function createHarness(loadingLatencyNoticeMs?: number) {
     waitForMovement: async () => undefined,
     waitForPageSettled: async () => undefined,
     loadingLatencyNoticeMs,
+    debug,
+    development,
   });
 
   return { button, companion, recorder, speechToText, textToSpeech, playback, reasoner, runtime, host };
@@ -140,6 +151,64 @@ describe('extension runtime', () => {
 
     expect(reasonCalls).toBe(2);
     expect(harness.recorder.record).toHaveBeenCalledTimes(1);
+    expect(harness.companion.getSnapshot().state).toBe('waiting');
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
+  it('emits opt-in safe semantic and target diagnostics without DOM references', async () => {
+    const events: ExtensionDebugEvent[] = [];
+    const harness = createHarness(undefined, {
+      enabled: true,
+      logger: (event) => events.push(event),
+    });
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    const snapshotEvent = events.find(
+      (event) => event.type === 'semantic-snapshot',
+    );
+    const targetEvent = events.find((event) => event.type === 'target-box');
+    expect(snapshotEvent).toMatchObject({
+      type: 'semantic-snapshot',
+      page: {
+        elements: [expect.objectContaining({ id: 'el_1' })],
+      },
+    });
+    expect(targetEvent).toMatchObject({
+      type: 'target-box',
+      targetId: 'el_1',
+      rect: { top: 100, bottom: 140, left: 100, right: 300 },
+    });
+    expect(targetEvent).not.toHaveProperty('element');
+    expect(snapshotEvent).not.toHaveProperty('page.elements[0].element');
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
+  it('enables mocked transcript and reasoner adapters only in development mode', async () => {
+    const developmentReasoner: Reasoner = {
+      reason: vi.fn(async () => ({ action: 'wait' as const })),
+    };
+    const harness = createHarness(undefined, undefined, {
+      enabled: true,
+      transcripts: [
+        { transcript: 'Development request', language: 'en-IN' },
+      ],
+      reasoner: developmentReasoner,
+    });
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(harness.speechToText.transcribe).not.toHaveBeenCalled();
+    expect(developmentReasoner.reason).toHaveBeenCalledTimes(1);
+    expect(harness.runtime.session.getState().goal).toBe('Development request');
     expect(harness.companion.getSnapshot().state).toBe('waiting');
 
     harness.runtime.stop();
