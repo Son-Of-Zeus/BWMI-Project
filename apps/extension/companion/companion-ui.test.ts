@@ -118,4 +118,17 @@ describe('companion UI', () => {
     expect(host.querySelector('[role="log"]')).toBeNull();
     expect(host.querySelector('aside')).toBeNull();
   });
+
+  it('delegates microphone clicks to the runtime when a listening handler is attached', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+    const handler = vi.fn();
+    store.setListeningHandler(handler);
+
+    store.toggleListening();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().state).toBe('idle');
+  });
 });

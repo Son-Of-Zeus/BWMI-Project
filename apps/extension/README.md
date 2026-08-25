@@ -10,7 +10,7 @@ The extension is the product.
 
 The shell is a WXT-powered Manifest V3 extension with a background entrypoint and a React content-script UI mounted in a Shadow DOM overlay. During development it is scoped to `http://localhost/*` and `http://127.0.0.1/*`, so it can run against the local mock portal without requesting `<all_urls>`.
 
-The mock portal is complete and must not be modified. All ongoing implementation and testing work belongs in this extension. The element registry now retains runtime IDs for surviving DOM nodes, reconciles rescans, and exposes live-target and model-safe snapshot APIs. Session state now provides bounded goal/action memory, pending-action tracking, and explicit companion-state transitions in memory. The interaction observer now captures semantic clicks, input/select status, and SPA navigation without preventing the website's own events. The reasoning boundary now builds minimal requests, posts to the backend, and strictly validates target-safe structured actions. The guide controller now orchestrates live-target scrolling, overlay/companion/speech adapters, cancellation, and layout remeasurement without auto-clicking. The voice boundary now provides cancellation-aware STT/TTS orchestration, backend-only speech requests, development transcripts, and browser audio adapters. The safety boundary now redacts sensitive request values, classifies consequential targets, and blocks disabled guidance before speech or pending-action creation. The flow controller now connects voice, rescans, reasoning, guidance, and observed user actions into a cancellable PF journey loop.
+The mock portal is complete and must not be modified. All ongoing implementation and testing work belongs in this extension. The element registry now retains runtime IDs for surviving DOM nodes, reconciles rescans, and exposes live-target and model-safe snapshot APIs. Session state now provides bounded goal/action memory, pending-action tracking, and explicit companion-state transitions in memory. The interaction observer now captures semantic clicks, input/select status, and SPA navigation without preventing the website's own events. The reasoning boundary now builds minimal requests, posts to the backend, and strictly validates target-safe structured actions. The guide controller now orchestrates live-target scrolling, overlay/companion/speech adapters, cancellation, and layout remeasurement without auto-clicking. The voice boundary now provides cancellation-aware STT/TTS orchestration, backend-only speech requests, development transcripts, and browser audio adapters. The safety boundary now redacts sensitive request values, classifies consequential targets, and blocks disabled guidance before speech or pending-action creation. The flow controller now connects voice, rescans, reasoning, guidance, and observed user actions into a cancellable PF journey loop. The runtime now composes these services at content-script mount, wires the microphone button, and tears everything down with the Shadow DOM.
 
 From this directory:
 
@@ -20,7 +20,7 @@ npm run dev
 npm run build
 ```
 
-The visible control is intentionally a shell placeholder. The DOM semantic layer now scans accessible interactive candidates, infers bounded labels and section context, tracks visibility separately from viewport position, and exposes a debounced `MutationObserver` scanner. Session state, action observation, reasoning, guidance, and voice are added in their respective feature passes.
+The companion control is wired to the extension runtime. The DOM semantic layer scans accessible interactive candidates, infers bounded labels and section context, tracks visibility separately from viewport position, and exposes a debounced `MutationObserver` scanner. Session state, action observation, reasoning, guidance, voice, safety, flow orchestration, and runtime composition are covered by their respective feature boundaries.
 
 ## Responsibilities
 
@@ -52,6 +52,7 @@ extension/
 ├── guide/
 ├── companion/
 ├── flow/
+├── runtime/
 ├── voice/
 ├── session/
 └── shared/
@@ -64,9 +65,8 @@ High-level boot sequence:
 ```ts
 async function bootstrap() {
   mountShadowRoot();
-  startSemanticScanner();
-  startInteractionObserver();
-  initializeSession();
+  const runtime = createExtensionRuntime({ companion });
+  runtime.start();
   renderCompanion();
 }
 ```

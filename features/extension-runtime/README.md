@@ -1,0 +1,39 @@
+# Extension Runtime
+
+## Goal
+
+Compose the extension-owned services at the content-script boundary and give
+the companion a clean lifecycle.
+
+## Current Extension Implementation
+
+`apps/extension/runtime/extension-runtime.ts` constructs the scanner, registry,
+session, interaction observer, voice controller, guide controller, and PF flow
+controller. It binds the companion microphone to `requestVoice()`, maps runtime
+states into the UI, and accepts injected adapters for deterministic tests or a
+different backend deployment.
+
+`entrypoints/content/index.tsx` starts the runtime when the Shadow DOM mounts
+and stops it before teardown. Reasoning defaults to `/reason`, speech defaults
+to the provider-neutral speech paths, and no provider credentials are stored
+in the extension.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npm test -- --run runtime/extension-runtime.test.ts
+```
+
+## Lifecycle
+
+```text
+mount → create services → start scanner/observer → listen → flow → stop
+```
+
+Teardown removes the microphone handler, cancels active speech and guidance,
+and stops DOM observers before the Shadow DOM is removed.
+
+## Definition of Done
+
+Installing the extension mounts a working companion runtime without adding
+hooks, IDs, or assistant state to the website.
