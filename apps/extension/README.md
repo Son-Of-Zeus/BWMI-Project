@@ -10,7 +10,7 @@ The extension is the product.
 
 The shell is a WXT-powered Manifest V3 extension with a background entrypoint and a React content-script UI mounted in a Shadow DOM overlay. During development it is scoped to `http://localhost/*` and `http://127.0.0.1/*`, so it can run against the local mock portal without requesting `<all_urls>`.
 
-The mock portal is complete and must not be modified. All ongoing implementation and testing work belongs in this extension. The element registry now retains runtime IDs for surviving DOM nodes, reconciles rescans, and exposes live-target and model-safe snapshot APIs.
+The mock portal is complete and must not be modified. All ongoing implementation and testing work belongs in this extension. The element registry now retains runtime IDs for surviving DOM nodes, reconciles rescans, and exposes live-target and model-safe snapshot APIs. Session state now provides bounded goal/action memory, pending-action tracking, and explicit companion-state transitions in memory.
 
 From this directory:
 

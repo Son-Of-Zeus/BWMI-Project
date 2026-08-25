@@ -4,6 +4,16 @@
 
 Maintain enough short-lived context for reasoning across multiple user actions without hard-coding a fixed DOM journey.
 
+## Current Implementation
+
+The extension implementation lives in `apps/extension/session/session-state.ts`. It keeps a normalized goal, a bounded recent semantic-action window, a pending user action, and companion state in memory. State snapshots are cloned before being returned or published, and explanation actions do not overwrite the workflow goal or pending action.
+
+Run the focused tests from `apps/extension/` with:
+
+```sh
+npx vitest run session/session-state.test.ts
+```
+
 ## State Shape
 
 ```ts
