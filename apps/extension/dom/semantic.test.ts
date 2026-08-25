@@ -132,6 +132,21 @@ describe('DOM semantic layer', () => {
     );
   });
 
+  it('does not treat an empty select placeholder as completed', () => {
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Claim type');
+    select.innerHTML = '<option value="">Choose a claim type</option>';
+    document.body.append(select);
+
+    expect(discoverSemanticElements(document)).toEqual([
+      expect.objectContaining({
+        label: 'Claim type',
+        hasValue: false,
+        validationState: 'unknown',
+      }),
+    ]);
+  });
+
   it('debounces mutation-driven rescans and stops observing after cleanup', async () => {
     vi.useFakeTimers();
     const scanner = createSemanticScanner({ debounceMs: 50 });

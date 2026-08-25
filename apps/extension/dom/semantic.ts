@@ -312,7 +312,8 @@ function getHasValue(element: HTMLElement): boolean | undefined {
   }
 
   if (tagName === 'select') {
-    return (element as HTMLSelectElement).selectedIndex >= 0;
+    const select = element as HTMLSelectElement;
+    return select.selectedIndex >= 0 && select.value.length > 0;
   }
 
   if (element.getAttribute('contenteditable') === 'true') {

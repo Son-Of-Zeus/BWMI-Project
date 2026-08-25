@@ -166,6 +166,59 @@ describe('interaction observer', () => {
     observer.stop();
   });
 
+  it('keeps invalid input pending until a non-empty valid value is present', () => {
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.setAttribute('aria-invalid', 'true');
+    document.body.append(input);
+
+    const registry = createElementRegistry();
+    registry.reconcile([
+      discovered(input, 'UAN', { role: 'textbox', hasValue: true }),
+    ]);
+    const session = createSessionState();
+    session.setPendingAction({
+      targetId: 'el_1',
+      expectedUserAction: 'input',
+    });
+    const events: unknown[] = [];
+    const observer = createInteractionObserver({
+      registry,
+      session,
+      onEvent: (event) => events.push(event),
+      now: () => 35,
+    });
+    observer.start();
+
+    input.value = 'invalid';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(events[0]).toMatchObject({
+      type: 'input-complete',
+      matchedPending: false,
+      hasValue: true,
+      validationState: 'invalid',
+    });
+    expect(session.getState().pendingAction).toEqual({
+      targetId: 'el_1',
+      expectedUserAction: 'input',
+    });
+
+    input.setAttribute('aria-invalid', 'false');
+    input.value = 'valid';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(events[1]).toMatchObject({
+      type: 'input-complete',
+      matchedPending: true,
+      hasValue: true,
+      validationState: 'valid',
+    });
+    expect(session.getState().pendingAction).toBeUndefined();
+    expect(JSON.stringify(events)).not.toContain('"value"');
+    observer.stop();
+  });
+
   it('reports select changes using the select action type', () => {
     const select = document.createElement('select');
     select.innerHTML = '<option value="withdrawal">Withdrawal</option>';

@@ -134,12 +134,17 @@ function actionMatchesPending(
   targetId: string,
   action: ObservedAction,
   expectedUserAction: ExpectedUserAction | undefined,
+  controlState: { hasValue?: boolean; validationState?: ValidationState },
 ): boolean {
-  return Boolean(
-    expectedUserAction &&
-      expectedUserAction === action &&
-      targetId,
-  );
+  if (!expectedUserAction || expectedUserAction !== action || !targetId) {
+    return false;
+  }
+
+  if (action === 'click') {
+    return true;
+  }
+
+  return controlState.hasValue === true && controlState.validationState !== 'invalid';
 }
 
 export function createInteractionObserver(
@@ -169,11 +174,13 @@ export function createInteractionObserver(
       return;
     }
 
+    const controlState = readSafeControlState(entry.element);
     const pendingAction = options.session.getState().pendingAction;
     const matchedPending = actionMatchesPending(
       entry.id,
       action,
       pendingAction?.expectedUserAction,
+      controlState,
     ) && pendingAction?.targetId === entry.id;
 
     if (matchedPending) {
@@ -194,7 +201,6 @@ export function createInteractionObserver(
       return;
     }
 
-    const controlState = readSafeControlState(entry.element);
     const sharedEvent = {
       targetId: entry.id,
       label: entry.label,
