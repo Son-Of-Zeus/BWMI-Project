@@ -73,6 +73,7 @@ function createHarness(
     speech,
     viewport: () => ({ width: 800, height: 600 }),
     waitForLayout: async () => undefined,
+    waitForMovement: async () => undefined,
   });
 
   return {
@@ -130,6 +131,87 @@ describe('guide controller', () => {
     expect(clickSpy).not.toHaveBeenCalled();
   });
 
+  it('waits for companion movement to settle before speaking', async () => {
+    const harness = createHarness();
+    const events: string[] = [];
+    let resolveMovement!: () => void;
+    const waitForMovement = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMovement = resolve;
+        }),
+    );
+    harness.companion.setTarget = vi.fn(() => {
+      events.push('move');
+    });
+    harness.speech.say = vi.fn(async () => {
+      events.push('speak');
+    });
+    const controller = createGuideController({
+      document,
+      registry: harness.registry,
+      session: harness.session,
+      overlay: harness.overlay,
+      companion: harness.companion,
+      speech: harness.speech,
+      viewport: () => ({ width: 800, height: 600 }),
+      waitForLayout: async () => undefined,
+      waitForMovement,
+    });
+
+    const run = controller.run({
+      action: 'guide',
+      targetId: 'el_1',
+      spokenInstruction: 'Target par click kariye.',
+      expectedUserAction: 'click',
+      language: 'hi-IN',
+    });
+    await Promise.resolve();
+
+    expect(waitForMovement).toHaveBeenCalledTimes(1);
+    expect(harness.speech.say).not.toHaveBeenCalled();
+    resolveMovement();
+
+    await expect(run).resolves.toEqual({ status: 'guided', targetId: 'el_1' });
+    expect(events).toEqual(['move', 'speak']);
+  });
+
+  it('cancels a pending movement before speech can start', async () => {
+    const harness = createHarness();
+    let resolveMovement!: () => void;
+    const waitForMovement = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveMovement = resolve;
+        }),
+    );
+    const controller = createGuideController({
+      document,
+      registry: harness.registry,
+      session: harness.session,
+      overlay: harness.overlay,
+      companion: harness.companion,
+      speech: harness.speech,
+      viewport: () => ({ width: 800, height: 600 }),
+      waitForLayout: async () => undefined,
+      waitForMovement,
+    });
+
+    const run = controller.run({
+      action: 'guide',
+      targetId: 'el_1',
+      spokenInstruction: 'Target par click kariye.',
+      expectedUserAction: 'click',
+      language: 'hi-IN',
+    });
+    await Promise.resolve();
+    controller.cancel();
+    resolveMovement();
+
+    await expect(run).resolves.toEqual({ status: 'cancelled' });
+    expect(harness.speech.say).not.toHaveBeenCalled();
+  });
+
   it('uses auto scrolling when reduced motion is preferred', async () => {
     const harness = createHarness(rect(900, 940));
     const controller = createGuideController({
@@ -142,6 +224,7 @@ describe('guide controller', () => {
       viewport: () => ({ width: 800, height: 600 }),
       prefersReducedMotion: () => true,
       waitForLayout: async () => undefined,
+      waitForMovement: async () => undefined,
     });
 
     await controller.run({
@@ -258,6 +341,7 @@ describe('guide controller', () => {
       expectedUserAction: 'click',
       language: 'en-IN',
     });
+    await Promise.resolve();
     await Promise.resolve();
     harness.controller.cancel();
     resolveSpeech();

@@ -24,6 +24,8 @@ export type GuideSpeech = {
   cancel(): void;
 };
 
+export const DEFAULT_COMPANION_MOVE_DURATION_MS = 220;
+
 export type GuideControllerOptions = {
   document?: Document;
   registry: ElementRegistry;
@@ -34,6 +36,7 @@ export type GuideControllerOptions = {
   viewport?: () => Viewport;
   prefersReducedMotion?: () => boolean;
   waitForLayout?: () => Promise<void>;
+  waitForMovement?: () => Promise<void>;
   onMissingTarget?: (targetId: string) => void;
 };
 
@@ -99,6 +102,23 @@ function defaultWaitForLayout(documentNode: Document): Promise<void> {
   });
 }
 
+function defaultWaitForMovement(
+  documentNode: Document,
+  prefersReducedMotion: () => boolean,
+): Promise<void> {
+  if (prefersReducedMotion()) {
+    return Promise.resolve();
+  }
+
+  const windowNode = documentNode.defaultView;
+  return new Promise((resolve) => {
+    (windowNode ?? globalThis).setTimeout(
+      resolve,
+      DEFAULT_COMPANION_MOVE_DURATION_MS,
+    );
+  });
+}
+
 function needsScroll(rect: DOMRect, viewport: Viewport): boolean {
   return !isInViewport(rect, viewport);
 }
@@ -113,6 +133,9 @@ export function createGuideController(
     options.prefersReducedMotion ?? (() => defaultPrefersReducedMotion(documentNode));
   const waitForLayout =
     options.waitForLayout ?? (() => defaultWaitForLayout(documentNode));
+  const waitForMovement =
+    options.waitForMovement ??
+    (() => defaultWaitForMovement(documentNode, prefersReducedMotion));
 
   let generation = 0;
   let activeCleanup: (() => void) | undefined;
@@ -224,6 +247,10 @@ export function createGuideController(
       options.companion.setTarget(rect);
       setCompanionState('guiding');
       activeCleanup = startLayoutTracking(entry, runGeneration);
+      await waitForMovement();
+      if (!isCurrent(runGeneration)) {
+        return { status: 'cancelled' };
+      }
     }
 
     return { status: 'ready', entry, rect };

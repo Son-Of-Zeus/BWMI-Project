@@ -8,7 +8,7 @@ The companion is not the mouse pointer and must never replace the system cursor.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/companion/`. `Companion.tsx` renders the eight required states through an external UI store with labeled region, busy, live-status, retry, follow-up, demo-reset, and slow-work semantics, while `companion-ui.ts` provides fixed-position focus-mask and highlight layers plus guide-controller adapters. Overlay layers use `pointer-events: none`, and position/motion helpers clamp the companion to the viewport and respect reduced motion.
+The extension implementation lives in `apps/extension/companion/`. `Companion.tsx` renders the eight required states through an external UI store with labeled region, busy, live-status, retry, follow-up, demo-reset, and slow-work semantics, while `companion-ui.ts` provides fixed-position focus-mask and highlight layers plus guide-controller adapters. Overlay layers use `pointer-events: none`, and position/motion helpers clamp the companion to the viewport, use calm transition timing, and respect reduced motion.
 
 Run the focused tests from `apps/extension/` with:
 

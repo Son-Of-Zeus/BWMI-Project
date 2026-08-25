@@ -81,6 +81,7 @@ function createHarness(loadingLatencyNoticeMs?: number) {
     playback,
     viewport: () => ({ width: 800, height: 600 }),
     waitForLayout: async () => undefined,
+    waitForMovement: async () => undefined,
     waitForPageSettled: async () => undefined,
     loadingLatencyNoticeMs,
   });

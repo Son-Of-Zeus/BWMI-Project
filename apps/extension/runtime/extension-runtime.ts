@@ -57,6 +57,7 @@ export type ExtensionRuntimeOptions = {
   viewport?: () => Viewport;
   prefersReducedMotion?: () => boolean;
   waitForLayout?: () => Promise<void>;
+  waitForMovement?: () => Promise<void>;
   waitForPageSettled?: () => Promise<void>;
   loadingLatencyNoticeMs?: number;
 };
@@ -121,6 +122,7 @@ export function createExtensionRuntime(
     viewport: options.viewport,
     prefersReducedMotion: options.prefersReducedMotion,
     waitForLayout: options.waitForLayout,
+    waitForMovement: options.waitForMovement,
   });
   const reasoner =
     options.reasoner ??
