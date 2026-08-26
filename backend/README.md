@@ -17,13 +17,18 @@ npm start    # run Gemini/Sarvam-backed API on 127.0.0.1:8787
 PROTOTYPE_MODE=true npm start  # use deterministic adapters without provider keys
 ```
 
-Set `PORT`, `HOST`, or a comma-separated `ALLOWED_ORIGINS` when needed. The
-normal server calls Google's Gemini `generateContent` endpoint directly for
+When started with `npm start`, the backend automatically loads `backend/.env`
+if it exists. Shell environment variables still take precedence. Set `PORT`,
+`HOST`, or a comma-separated `ALLOWED_ORIGINS` when needed. The normal server
+calls Google's Gemini `generateContent` endpoint directly for
 reasoning and Sarvam REST APIs for speech. Configure `GEMINI_API_KEY`, with
 optional `GEMINI_MODEL` and `GEMINI_API_BASE_URL` overrides. The default Gemini
 model is `gemini-2.5-flash`; Sarvam model, speaker, and language settings are
-also environment-configurable. Provider secrets stay in the backend process
-and never enter the extension bundle.
+also environment-configurable. Set `SARVAM_LOG_RESPONSES=true` temporarily to
+log the parsed Sarvam speech-to-text response (including provider error bodies)
+while debugging; responses can contain transcripts and timestamps, so disable
+it afterward. Provider secrets stay in the backend process and never enter the
+extension bundle.
 
 `PROTOTYPE_MODE=true` explicitly selects the deterministic adapters: a PF
 transcript for the first voice turn, an “I'm done” transcript for the next

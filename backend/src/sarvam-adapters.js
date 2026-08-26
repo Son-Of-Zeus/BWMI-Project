@@ -45,20 +45,40 @@ function extensionFor(contentType) {
   );
 }
 
-async function jsonResponse(response, serviceName) {
+async function jsonResponse(response, serviceName, logger) {
+  let payload;
+  try {
+    payload = await response.json();
+  } catch {
+    logger?.('[Sarvam response]', {
+      service: serviceName,
+      status: response.status,
+      ok: response.ok,
+      body: '<non-JSON response>',
+    });
+    throw new Error(`${serviceName} returned invalid JSON.`);
+  }
+
+  logger?.('[Sarvam response]', {
+    service: serviceName,
+    status: response.status,
+    ok: response.ok,
+    body: payload,
+  });
+
   if (!response.ok) {
     throw new Error(`${serviceName} returned HTTP ${response.status}.`);
   }
-  try {
-    return await response.json();
-  } catch {
-    throw new Error(`${serviceName} returned invalid JSON.`);
-  }
+
+  return payload;
 }
 
 export function createSarvamTranscriber(options = {}) {
   const fetcher = options.fetcher ?? fetch;
   const baseUrl = baseUrlFrom(options);
+  const shouldLogResponses =
+    options.logResponses ?? process.env.SARVAM_LOG_RESPONSES === 'true';
+  const logger = shouldLogResponses ? options.logger ?? console.log : undefined;
   const model = options.model ?? process.env.SARVAM_STT_MODEL ?? DEFAULT_STT_MODEL;
   const mode = options.mode ?? process.env.SARVAM_STT_MODE ?? DEFAULT_STT_MODE;
   const languageCode =
@@ -81,7 +101,11 @@ export function createSarvamTranscriber(options = {}) {
         headers: { 'api-subscription-key': apiKey },
         body: form,
       });
-      const payload = await jsonResponse(response, 'Sarvam speech-to-text');
+      const payload = await jsonResponse(
+        response,
+        'Sarvam speech-to-text',
+        logger,
+      );
       return validateSpeechResult({
         transcript: payload?.transcript,
         ...(payload?.language_code ? { language: payload.language_code } : {}),

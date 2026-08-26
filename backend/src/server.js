@@ -27,6 +27,25 @@ const DEFAULT_HOSTNAME = '127.0.0.1';
 const DEFAULT_PORT = 8_787;
 const DEFAULT_AUDIO_MIME_TYPE = 'audio/mpeg';
 const MIME_TYPE_PATTERN = /^[\w!#$&^+.-]+\/[\w!#$&^+.-]+$/;
+const ENV_FILE_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../.env',
+);
+
+function loadEnvironmentFile() {
+  if (typeof process.loadEnvFile !== 'function') {
+    return;
+  }
+
+  try {
+    process.loadEnvFile(ENV_FILE_PATH);
+  } catch (error) {
+    if (error && typeof error === 'object' && error.code === 'ENOENT') {
+      return;
+    }
+    throw error;
+  }
+}
 
 export class HttpError extends Error {
   constructor(status, message) {
@@ -326,6 +345,7 @@ function parsePort(value) {
 }
 
 async function startFromCommandLine() {
+  loadEnvironmentFile();
   const app = createBackendServer({
     allowedOrigins: process.env.ALLOWED_ORIGINS ?? '*',
     usePrototypeAdapters: process.env.PROTOTYPE_MODE === 'true',

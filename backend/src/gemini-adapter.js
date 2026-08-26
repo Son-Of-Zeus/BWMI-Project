@@ -20,6 +20,7 @@ Rules:
 - The user must perform every click, input, select, consent, OTP, identity, and financial action.
 - Never return selectors, JavaScript, HTML, raw form values, credentials, or executable instructions.
 - Keep spokenInstruction and consequence short and practical in the user's language style.
+- Set expectedUserAction to exactly one lowercase value: click, input, or select; never a sentence.
 - For an input target, tell the user to say “I'm done” when they finish entering information.
 - For a consequential guide target, include a short consequence sentence.
 - Never treat hasValue or validationState as the user's completion signal for a text input. When session.pendingAction.type is input, wait for an explicit phrase such as "I'm done", "finished", or "I have entered it" before advancing; explanation questions may be answered without advancing.
@@ -124,12 +125,41 @@ function parseGeminiContent(payload) {
   if (content.trim().length === 0) {
     throw new Error('Gemini response did not contain model text.');
   }
+  if (payload?.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+    throw new Error('Gemini response was truncated at the output token limit.');
+  }
 
   try {
     return JSON.parse(content);
   } catch {
     throw new Error('Gemini model content was not valid JSON.');
   }
+}
+
+function normalizeGuideAction(value, elements) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    value.action !== 'guide' ||
+    typeof value.targetId !== 'string'
+  ) {
+    return value;
+  }
+
+  const target = elements.find((element) => element.id === value.targetId);
+  if (!target) {
+    return value;
+  }
+
+  const expectedUserAction =
+    target.role === 'textbox'
+      ? 'input'
+      : target.role === 'combobox'
+        ? 'select'
+        : 'click';
+
+  return { ...value, expectedUserAction };
 }
 
 function configuredBaseUrl(options) {
@@ -158,32 +188,39 @@ export function createGeminiReasoner(options = {}) {
       const endpoint = endpointFor(baseUrl, model);
 
       logger('[Gemini call]');
-      const response = await fetcher(endpoint, {
-        method: 'POST',
-        headers: {
-          accept: 'application/json',
-          'content-type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        signal: timeoutSignal(timeoutMs),
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: GUIDE_ACTION_SYSTEM_PROMPT }],
+      try {
+        const response = await fetcher(endpoint, {
+          method: 'POST',
+          headers: {
+            accept: 'application/json',
+            'content-type': 'application/json',
+            'x-goog-api-key': apiKey,
           },
-          contents: buildGeminiContents(request),
-          generationConfig: {
-            candidateCount: 1,
-            temperature: 0,
-            maxOutputTokens: 320,
-            responseMimeType: 'application/json',
-          },
-        }),
-      });
-      const payload = await responseJson(response, 'request');
-      return validateGuideAction(
-        parseGeminiContent(payload),
-        request.page.elements,
-      );
+          signal: timeoutSignal(timeoutMs),
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: GUIDE_ACTION_SYSTEM_PROMPT }],
+            },
+            contents: buildGeminiContents(request),
+            generationConfig: {
+              candidateCount: 1,
+              temperature: 0,
+              responseMimeType: 'application/json',
+            },
+          }),
+        });
+        const payload = await responseJson(response, 'request');
+        return validateGuideAction(
+          normalizeGuideAction(parseGeminiContent(payload), request.page.elements),
+          request.page.elements,
+        );
+      } catch (error) {
+        logger(
+          '[Gemini error]',
+          error instanceof Error ? error.message : 'Gemini request failed.',
+        );
+        throw error;
+      }
     },
   };
 }

@@ -80,11 +80,70 @@ test('Gemini adapter sends a direct structured reasoning request', async () => {
 
   const payload = JSON.parse(captured.init.body);
   assert.equal(payload.generationConfig.temperature, 0);
-  assert.equal(payload.generationConfig.maxOutputTokens, 320);
+  assert.equal('maxOutputTokens' in payload.generationConfig, false);
   assert.equal(payload.generationConfig.responseMimeType, 'application/json');
   assert.match(payload.systemInstruction.parts[0].text, /targetId/);
   assert.equal(payload.contents[0].role, 'user');
   assert.match(payload.contents[0].parts[0].text, /Online Services/);
+});
+
+test('Gemini adapter logs an upstream status without logging request context', async () => {
+  const events = [];
+  const reasoner = createGeminiReasoner({
+    baseUrl: 'https://generativelanguage.test/v1beta',
+    model: 'gemini-3.5-flash',
+    apiKey: 'test-gemini-key',
+    logger: (...args) => events.push(args),
+    fetcher: async () => ({ ok: false, status: 404 }),
+  });
+
+  await assert.rejects(
+    () => reasoner.reason(createReasonRequest()),
+    /HTTP 404/,
+  );
+  assert.deepEqual(events, [
+    ['[Gemini call]'],
+    ['[Gemini error]', 'Gemini request failed with HTTP 404.'],
+  ]);
+  assert.doesNotMatch(JSON.stringify(events), /test-gemini-key|Online Services/);
+});
+
+test('Gemini adapter derives the user action from the validated target role', async () => {
+  const reasoner = createGeminiReasoner({
+    baseUrl: 'https://generativelanguage.test/v1beta',
+    apiKey: 'test-gemini-key',
+    logger: () => undefined,
+    fetcher: async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      action: 'guide',
+                      targetId: 'el_online',
+                      spokenInstruction: 'Click Online Services.',
+                      expectedUserAction: 'Click the Online Services button.',
+                      language: 'en-IN',
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        };
+      },
+    }),
+  });
+
+  await assert.doesNotReject(async () => {
+    const result = await reasoner.reason(createReasonRequest());
+    assert.equal(result.expectedUserAction, 'click');
+  });
 });
 
 test('Gemini adapter fails clearly when the provider key is absent', async () => {
@@ -105,6 +164,7 @@ test('Gemini adapter rejects non-JSON model content', async () => {
   const reasoner = createGeminiReasoner({
     baseUrl: 'https://generativelanguage.test/v1beta',
     apiKey: 'test-gemini-key',
+    logger: () => undefined,
     fetcher: async () => ({
       ok: true,
       status: 200,
@@ -160,6 +220,49 @@ test('Sarvam STT adapter sends multipart audio and maps the provider result', as
     [...new Uint8Array(await captured.init.body.get('file').arrayBuffer())],
     [1, 2, 3],
   );
+});
+
+test('Sarvam STT adapter logs the provider response only when enabled', async () => {
+  const events = [];
+  const transcriber = createSarvamTranscriber({
+    baseUrl: 'https://sarvam.test',
+    apiKey: 'test-key',
+    logResponses: true,
+    logger: (...args) => events.push(args),
+    fetcher: async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          request_id: 'request-123',
+          transcript: 'Test transcript',
+          language_code: 'en-IN',
+        };
+      },
+    }),
+  });
+
+  await transcriber.transcribe({
+    audio: Buffer.from([1, 2, 3]),
+    contentType: 'audio/webm',
+  });
+
+  assert.deepEqual(events, [
+    [
+      '[Sarvam response]',
+      {
+        service: 'Sarvam speech-to-text',
+        status: 200,
+        ok: true,
+        body: {
+          request_id: 'request-123',
+          transcript: 'Test transcript',
+          language_code: 'en-IN',
+        },
+      },
+    ],
+  ]);
+  assert.doesNotMatch(JSON.stringify(events), /test-key|audio/);
 });
 
 test('Sarvam TTS adapter maps base64 WAV audio to a provider-neutral result', async () => {
