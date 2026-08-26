@@ -65,6 +65,11 @@ export default function Companion({ store }: CompanionProps) {
   const position = snapshot.targetRect
     ? getCompanionPosition(snapshot.targetRect, viewport)
     : undefined;
+  const targetSide = snapshot.targetRect && position
+    ? position.left >= snapshot.targetRect.right
+      ? 'right'
+      : 'left'
+    : undefined;
   const style = position
     ? {
         left: `${position.left}px`,
@@ -77,7 +82,11 @@ export default function Companion({ store }: CompanionProps) {
   return (
     <section
       role="region"
-      className={`companion-surface companion-surface--${snapshot.state}`}
+      className={[
+        'companion-surface',
+        `companion-surface--${snapshot.state}`,
+        targetSide ? `companion-surface--target-${targetSide}` : '',
+      ].filter(Boolean).join(' ')}
       aria-label="Voice companion"
       aria-busy={isBusy}
       data-companion-state={snapshot.state}
@@ -93,45 +102,54 @@ export default function Companion({ store }: CompanionProps) {
         aria-pressed={isListening}
         onClick={() => store.toggleListening()}
       >
-        <span className="companion-orb" aria-hidden="true" />
-      </button>
-      <div className="companion-copy">
-        <span
-          className="companion-status"
-          id={COMPANION_STATUS_ID}
-          role="status"
-          aria-live={snapshot.state === 'error' ? 'assertive' : 'polite'}
-          aria-atomic="true"
+        <svg
+          className="companion-cursor"
+          viewBox="0 0 34 42"
+          aria-hidden="true"
+          focusable="false"
         >
-          {statusLabel}
-        </span>
-        {snapshot.latencyMetrics.length > 0 ? (
-          <details className="companion-latency">
-            <summary aria-label="Show latency breakdown">
-              {formatLatency(measuredTotalMs)} measured
-            </summary>
-            <ul className="companion-latency-popover">
-              {snapshot.latencyMetrics.map((metric, index) => (
-                <li key={`${metric.stage}-${index}`}>
-                  <span>{LATENCY_STAGE_LABELS[metric.stage]}</span>
-                  <strong>{formatLatency(metric.durationMs)}</strong>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ) : (
-          <span className="companion-hint">Tap to speak</span>
-        )}
-      </div>
-      <button
-        className="companion-reset"
-        type="button"
-        aria-label="Reset demo"
-        title="Reset demo"
-        onClick={() => store.resetDemo()}
-      >
-        <span aria-hidden="true">↺</span>
+          <path d="M4 3.5v29.1l7.6-7.2 5.6 12.2 6.3-3-5.7-11.8h11.3L4 3.5Z" />
+        </svg>
       </button>
+      <div className="companion-panel">
+        <div className="companion-copy">
+          <span
+            className="companion-status"
+            id={COMPANION_STATUS_ID}
+            role="status"
+            aria-live={snapshot.state === 'error' ? 'assertive' : 'polite'}
+            aria-atomic="true"
+          >
+            {statusLabel}
+          </span>
+          {snapshot.latencyMetrics.length > 0 ? (
+            <details className="companion-latency">
+              <summary aria-label="Show latency breakdown">
+                {formatLatency(measuredTotalMs)} measured
+              </summary>
+              <ul className="companion-latency-popover">
+                {snapshot.latencyMetrics.map((metric, index) => (
+                  <li key={`${metric.stage}-${index}`}>
+                    <span>{LATENCY_STAGE_LABELS[metric.stage]}</span>
+                    <strong>{formatLatency(metric.durationMs)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : (
+            <span className="companion-hint">Tap the cursor to speak</span>
+          )}
+        </div>
+        <button
+          className="companion-reset"
+          type="button"
+          aria-label="Reset demo"
+          title="Reset demo"
+          onClick={() => store.resetDemo()}
+        >
+          <span aria-hidden="true">↺</span>
+        </button>
+      </div>
     </section>
   );
 }

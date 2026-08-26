@@ -9,9 +9,11 @@ The companion is not the mouse pointer and must never replace the system cursor.
 ## Current Implementation
 
 The extension implementation lives in `apps/extension/companion/`.
-`Companion.tsx` renders the eight required states as one compact red card with
-an integrated microphone, status, reset control, and expandable latency
-breakdown. The external store retains labeled-region, busy, live-status,
+`Companion.tsx` renders the eight required states as a red cursor with a compact
+attached status bubble, reset control, and expandable latency breakdown. The
+cursor moves beside the highlighted target and flips horizontally when it must
+sit on the target's left, keeping its tip closest to the control. The external
+store retains labeled-region, busy, live-status,
 retry, follow-up, demo-reset, and slow-work semantics. `companion-ui.ts`
 provides fixed-position, target-aligned focus-mask and red highlight layers
 plus guide-controller adapters. Overlay layers use `pointer-events: none`, and
@@ -41,7 +43,7 @@ error
 
 Recommended MVP form:
 
-- compact red card with a small orb / intelligent dot
+- red cursor with a compact attached status bubble
 - calm scale or glow changes
 - subtle directional motion
 - no character animation dependency

@@ -30,14 +30,14 @@ describe('companion UI', () => {
         width: 1200,
         height: 800,
       }),
-    ).toEqual({ left: 316, top: 94 });
+    ).toEqual({ left: 308, top: 98 });
 
     expect(
       getCompanionPosition(rect(100, 160, 1080, 1180), {
         width: 1200,
         height: 800,
       }),
-    ).toEqual({ left: 816, top: 94 });
+    ).toEqual({ left: 852, top: 98 });
   });
 
   it('clamps the companion inside the viewport edges', () => {

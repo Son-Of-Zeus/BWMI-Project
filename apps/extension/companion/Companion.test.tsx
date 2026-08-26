@@ -34,8 +34,10 @@ describe('Companion accessibility', () => {
 
     const surface = host.querySelector('[role="region"]') as HTMLElement;
     const button = host.querySelector('button') as HTMLButtonElement;
+    const cursor = host.querySelector('.companion-cursor') as SVGElement;
     const status = host.querySelector(`#${COMPANION_STATUS_ID}`) as HTMLElement;
     expect(surface.getAttribute('aria-label')).toBe('Voice companion');
+    expect(cursor.tagName.toLowerCase()).toBe('svg');
     expect(surface.getAttribute('aria-busy')).toBe('false');
     expect(button.getAttribute('aria-describedby')).toBe(COMPANION_STATUS_ID);
     expect(status.getAttribute('role')).toBe('status');
@@ -62,6 +64,37 @@ describe('Companion accessibility', () => {
     expect(button.getAttribute('aria-label')).toBe('Try voice guidance again');
     expect(status.getAttribute('aria-live')).toBe('assertive');
     expect(status.textContent).toContain('Try again');
+
+    root.unmount();
+    store.destroy();
+  });
+
+  it('flips the red cursor so its tip stays nearest a left-side target', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+    store.setTarget({
+      top: 100,
+      bottom: 140,
+      left: 760,
+      right: 790,
+      width: 30,
+      height: 40,
+      x: 760,
+      y: 100,
+      toJSON: () => ({}),
+    } as DOMRect);
+    const reactMount = document.createElement('div');
+    host.append(reactMount);
+    const root = ReactDOM.createRoot(reactMount);
+
+    await act(async () => {
+      root.render(<Companion store={store} />);
+    });
+
+    expect(host.querySelector('[role="region"]')?.className).toContain(
+      'companion-surface--target-left',
+    );
 
     root.unmount();
     store.destroy();

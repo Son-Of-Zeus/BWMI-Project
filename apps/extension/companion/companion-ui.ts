@@ -43,10 +43,10 @@ export type CompanionUiStore = GuideOverlay &
   };
 
 export const DEFAULT_COMPANION_DIMENSIONS: CompanionDimensions = {
-  width: 248,
-  height: 72,
+  width: 220,
+  height: 64,
   edgePadding: 16,
-  targetGap: 16,
+  targetGap: 8,
 };
 
 export const COMPANION_STATE_LABELS: Record<CompanionState, string> = {
