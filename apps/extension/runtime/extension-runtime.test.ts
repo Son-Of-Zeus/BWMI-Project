@@ -5,6 +5,7 @@ import type {
   AudioPlayback,
   AudioRecorder,
   SpeechToText,
+  SynthesizedAudio,
   TextToSpeech,
 } from '../voice/voice';
 import {
@@ -58,7 +59,10 @@ function createHarness(
     })),
   };
   const textToSpeech: TextToSpeech = {
-    synthesize: vi.fn(async () => new Uint8Array([1, 2]).buffer),
+    synthesize: vi.fn(async (): Promise<SynthesizedAudio> => ({
+      audio: new Uint8Array([1, 2]).buffer,
+      mimeType: 'audio/wav',
+    })),
   };
   const playback: AudioPlayback = {
     play: vi.fn(async () => undefined),
@@ -172,7 +176,7 @@ describe('extension runtime', () => {
     expect(harness.latencyLogger).toHaveBeenCalled();
   });
 
-  it('defaults reasoning requests to the local Gemini-backed backend', async () => {
+  it('defaults reasoning requests to the local Groq-backed backend', async () => {
     const harness = createHarness(undefined, undefined, undefined, true);
     harness.runtime.start();
 
@@ -363,10 +367,10 @@ describe('extension runtime', () => {
 
   it('announces slow speech synthesis and clears the notice after playback', async () => {
     const harness = createHarness(1);
-    let resolveSynthesis!: (audio: ArrayBuffer) => void;
+    let resolveSynthesis!: (audio: SynthesizedAudio) => void;
     harness.textToSpeech.synthesize = vi.fn(
       () =>
-        new Promise<ArrayBuffer>((resolve) => {
+        new Promise<SynthesizedAudio>((resolve) => {
           resolveSynthesis = resolve;
         }),
     );
@@ -380,7 +384,10 @@ describe('extension runtime', () => {
       latencyNotice: true,
     });
 
-    resolveSynthesis(new Uint8Array([1, 2]).buffer);
+    resolveSynthesis({
+      audio: new Uint8Array([1, 2]).buffer,
+      mimeType: 'audio/wav',
+    });
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(harness.companion.getSnapshot()).toMatchObject({

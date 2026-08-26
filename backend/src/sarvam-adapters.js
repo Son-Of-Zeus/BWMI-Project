@@ -167,6 +167,28 @@ async function jsonResponse(
   return payload;
 }
 
+const BASE64_AUDIO_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+function decodeTtsAudio(payload) {
+  const audioParts = Array.isArray(payload?.audios)
+    ? payload.audios.filter((audio) => typeof audio === 'string' && audio.length > 0)
+    : [];
+  if (audioParts.length === 0) {
+    throw new Error('Sarvam text-to-speech returned no audio.');
+  }
+
+  const encodedAudio = audioParts.join('').replace(/\s+/g, '');
+  if (!BASE64_AUDIO_PATTERN.test(encodedAudio)) {
+    throw new Error('Sarvam text-to-speech returned invalid audio.');
+  }
+
+  const audio = Buffer.from(encodedAudio, 'base64');
+  if (audio.length === 0) {
+    throw new Error('Sarvam text-to-speech returned empty audio.');
+  }
+  return audio;
+}
+
 export function createSarvamTranscriber(options = {}) {
   const fetcher = options.fetcher ?? fetch;
   const baseUrl = baseUrlFrom(options);
@@ -228,7 +250,7 @@ export function createSarvamSynthesizer(options = {}) {
   return {
     async synthesize(input) {
       const apiKey = apiKeyFrom(options);
-      const payload = await requestWithRetry(async () => {
+      return requestWithRetry(async () => {
         const response = await fetcher(endpointFor(baseUrl, '/text-to-speech'), {
           method: 'POST',
           headers: {
@@ -237,28 +259,21 @@ export function createSarvamSynthesizer(options = {}) {
           },
           body: JSON.stringify({
             text: input.text,
-            target_language_code: input.language ?? defaultLanguage,
+            language_code: input.language ?? defaultLanguage,
             model,
             speaker,
           }),
         });
-        return jsonResponse(response, 'Sarvam text-to-speech', logger, true);
+        const payload = await jsonResponse(response, 'Sarvam text-to-speech', logger, true);
+        return {
+          audio: decodeTtsAudio(payload),
+          mimeType: 'audio/wav',
+        };
       }, {
         ...options,
         logger: options.logger ?? console.warn,
         serviceName: 'Sarvam text-to-speech',
       });
-      const audioParts = Array.isArray(payload?.audios)
-        ? payload.audios.filter((audio) => typeof audio === 'string' && audio.length > 0)
-        : [];
-      if (audioParts.length === 0) {
-        throw new Error('Sarvam text-to-speech returned no audio.');
-      }
-
-      return {
-        audio: Buffer.from(audioParts.join(''), 'base64'),
-        mimeType: 'audio/wav',
-      };
     },
   };
 }

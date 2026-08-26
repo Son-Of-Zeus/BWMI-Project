@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { validateReasonRequest } from '../src/contracts.js';
-import { createGeminiReasoner } from '../src/gemini-adapter.js';
+import { createGroqReasoner } from '../src/groq-adapter.js';
 import {
   createSarvamSynthesizer,
   createSarvamTranscriber,
@@ -30,13 +30,13 @@ function createReasonRequest() {
   });
 }
 
-test('Gemini adapter sends a direct structured reasoning request', async () => {
+test('Groq adapter sends a direct JSON reasoning request', async () => {
   let captured;
   const events = [];
-  const reasoner = createGeminiReasoner({
-    baseUrl: 'https://generativelanguage.test/v1beta',
-    model: 'gemini-2.5-flash',
-    apiKey: 'test-gemini-key',
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    apiKey: 'test-groq-key',
     logger: (...args) => events.push(['log', args]),
     fetcher: async (url, init) => {
       events.push(['fetch']);
@@ -46,20 +46,17 @@ test('Gemini adapter sends a direct structured reasoning request', async () => {
         status: 200,
         async json() {
           return {
-            candidates: [
+            choices: [
               {
-                content: {
-                  parts: [
-                    {
-                      text: JSON.stringify({
-                        action: 'guide',
-                        targetId: 'el_online',
-                        spokenInstruction: 'Online Services par click kariye.',
-                        expectedUserAction: 'click',
-                        language: 'hi-IN',
-                      }),
-                    },
-                  ],
+                finish_reason: 'stop',
+                message: {
+                  content: JSON.stringify({
+                    action: 'guide',
+                    targetId: 'el_online',
+                    spokenInstruction: 'Online Services par click kariye.',
+                    expectedUserAction: 'click',
+                    language: 'hi-IN',
+                  }),
                 },
               },
             ],
@@ -70,29 +67,88 @@ test('Gemini adapter sends a direct structured reasoning request', async () => {
   });
 
   await assert.doesNotReject(() => reasoner.reason(createReasonRequest()));
-  assert.deepEqual(events[0], ['log', ['[Gemini call]']]);
+  assert.deepEqual(events[0], ['log', ['[Groq call]']]);
   assert.deepEqual(events[1], ['fetch']);
   assert.equal(
     captured.url,
-    'https://generativelanguage.test/v1beta/models/gemini-2.5-flash:generateContent',
+    'https://api.groq.test/openai/v1/chat/completions',
   );
-  assert.equal(captured.init.headers['x-goog-api-key'], 'test-gemini-key');
+  assert.equal(captured.init.headers.authorization, 'Bearer test-groq-key');
 
   const payload = JSON.parse(captured.init.body);
-  assert.equal(payload.generationConfig.temperature, 0);
-  assert.equal('maxOutputTokens' in payload.generationConfig, false);
-  assert.equal(payload.generationConfig.responseMimeType, 'application/json');
-  assert.match(payload.systemInstruction.parts[0].text, /targetId/);
-  assert.equal(payload.contents[0].role, 'user');
-  assert.match(payload.contents[0].parts[0].text, /Online Services/);
+  assert.equal(payload.model, 'openai/gpt-oss-120b');
+  assert.equal(payload.temperature, 0);
+  assert.deepEqual(payload.response_format, { type: 'json_object' });
+  assert.equal(payload.messages[0].role, 'system');
+  assert.match(payload.messages[0].content, /targetId/);
+  assert.equal(payload.messages[1].role, 'user');
+  assert.match(payload.messages[1].content, /Online Services/);
 });
 
-test('Gemini adapter logs an upstream status without logging request context', async () => {
+test('Groq adapter retries transient transport failures', async () => {
+  const delays = [];
   const events = [];
-  const reasoner = createGeminiReasoner({
-    baseUrl: 'https://generativelanguage.test/v1beta',
-    model: 'gemini-3.5-flash',
-    apiKey: 'test-gemini-key',
+  let callCount = 0;
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    apiKey: 'test-groq-key',
+    retryDelayMs: 1,
+    sleep: async (delayMs) => delays.push(delayMs),
+    logger: (...args) => events.push(args),
+    fetcher: async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        const error = new Error('read ECONNRESET');
+        error.code = 'ECONNRESET';
+        throw error;
+      }
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    action: 'guide',
+                    targetId: 'el_online',
+                    spokenInstruction: 'Online Services par click kariye.',
+                    expectedUserAction: 'click',
+                    language: 'hi-IN',
+                  }),
+                },
+              },
+            ],
+          };
+        },
+      };
+    },
+  });
+
+  await assert.doesNotReject(() => reasoner.reason(createReasonRequest()));
+  assert.equal(callCount, 2);
+  assert.deepEqual(delays, [1]);
+  assert.deepEqual(events, [
+    ['[Groq call]'],
+    [
+      '[Groq retry]',
+      {
+        service: 'Groq reasoning',
+        attempt: 2,
+        delayMs: 1,
+      },
+    ],
+  ]);
+});
+
+test('Groq adapter logs an upstream status without logging request context', async () => {
+  const events = [];
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    apiKey: 'test-groq-key',
     logger: (...args) => events.push(args),
     fetcher: async () => ({ ok: false, status: 404 }),
   });
@@ -102,36 +158,32 @@ test('Gemini adapter logs an upstream status without logging request context', a
     /HTTP 404/,
   );
   assert.deepEqual(events, [
-    ['[Gemini call]'],
-    ['[Gemini error]', 'Gemini request failed with HTTP 404.'],
+    ['[Groq call]'],
+    ['[Groq error]', 'Groq request failed with HTTP 404.'],
   ]);
-  assert.doesNotMatch(JSON.stringify(events), /test-gemini-key|Online Services/);
+  assert.doesNotMatch(JSON.stringify(events), /test-groq-key|Online Services/);
 });
 
-test('Gemini adapter derives the user action from the validated target role', async () => {
-  const reasoner = createGeminiReasoner({
-    baseUrl: 'https://generativelanguage.test/v1beta',
-    apiKey: 'test-gemini-key',
+test('Groq adapter derives the user action from the validated target role', async () => {
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    apiKey: 'test-groq-key',
     logger: () => undefined,
     fetcher: async () => ({
       ok: true,
       status: 200,
       async json() {
         return {
-          candidates: [
+          choices: [
             {
-              content: {
-                parts: [
-                  {
-                    text: JSON.stringify({
-                      action: 'guide',
-                      targetId: 'el_online',
-                      spokenInstruction: 'Click Online Services.',
-                      expectedUserAction: 'Click the Online Services button.',
-                      language: 'en-IN',
-                    }),
-                  },
-                ],
+              message: {
+                content: JSON.stringify({
+                  action: 'guide',
+                  targetId: 'el_online',
+                  spokenInstruction: 'Click Online Services.',
+                  expectedUserAction: 'Click the Online Services button.',
+                  language: 'en-IN',
+                }),
               },
             },
           ],
@@ -146,9 +198,9 @@ test('Gemini adapter derives the user action from the validated target role', as
   });
 });
 
-test('Gemini adapter fails clearly when the provider key is absent', async () => {
-  const reasoner = createGeminiReasoner({
-    baseUrl: 'https://generativelanguage.test/v1beta',
+test('Groq adapter fails clearly when the provider key is absent', async () => {
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
     fetcher: async () => {
       throw new Error('fetch should not run');
     },
@@ -156,21 +208,21 @@ test('Gemini adapter fails clearly when the provider key is absent', async () =>
 
   await assert.rejects(
     () => reasoner.reason(createReasonRequest()),
-    /GEMINI_API_KEY/,
+    /GROQ_API_KEY/,
   );
 });
 
-test('Gemini adapter rejects non-JSON model content', async () => {
-  const reasoner = createGeminiReasoner({
-    baseUrl: 'https://generativelanguage.test/v1beta',
-    apiKey: 'test-gemini-key',
+test('Groq adapter rejects non-JSON model content', async () => {
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    apiKey: 'test-groq-key',
     logger: () => undefined,
     fetcher: async () => ({
       ok: true,
       status: 200,
       async json() {
         return {
-          candidates: [{ content: { parts: [{ text: 'not-json' }] } }],
+          choices: [{ message: { content: 'not-json' } }],
         };
       },
     }),
@@ -297,7 +349,7 @@ test('Sarvam TTS adapter maps base64 WAV audio to a provider-neutral result', as
   assert.equal(captured.init.headers['api-subscription-key'], 'test-key');
   assert.deepEqual(JSON.parse(captured.init.body), {
     text: 'Online Services par click kariye.',
-    target_language_code: 'hi-IN',
+    language_code: 'hi-IN',
     model: 'bulbul:v3',
     speaker: 'shubh',
   });
@@ -364,6 +416,84 @@ test('Sarvam adapters retry transient failures and honor Retry-After', async () 
       },
     ],
   ]);
+});
+
+test('Sarvam TTS retries empty successful audio payloads', async () => {
+  const delays = [];
+  const events = [];
+  const audio = Buffer.from([1, 2]);
+  let callCount = 0;
+  const synthesizer = createSarvamSynthesizer({
+    baseUrl: 'https://sarvam.test',
+    apiKey: 'test-key',
+    retryDelayMs: 1,
+    sleep: async (delayMs) => delays.push(delayMs),
+    logger: (...args) => events.push(args),
+    fetcher: async () => {
+      callCount += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return callCount === 1
+            ? { audios: [] }
+            : { audios: [audio.toString('base64')] };
+        },
+      };
+    },
+  });
+
+  const result = await synthesizer.synthesize({
+    text: 'Agla kadam.',
+    language: 'hi-IN',
+  });
+
+  assert.deepEqual([...result.audio], [...audio]);
+  assert.equal(result.mimeType, 'audio/wav');
+  assert.equal(callCount, 2);
+  assert.deepEqual(delays, [1]);
+  assert.deepEqual(events, [
+    [
+      '[Sarvam retry]',
+      {
+        service: 'Sarvam text-to-speech',
+        attempt: 2,
+        delayMs: 1,
+      },
+    ],
+  ]);
+});
+
+test('Sarvam TTS retries invalid successful audio payloads', async () => {
+  const audio = Buffer.from([3, 4]);
+  let callCount = 0;
+  const synthesizer = createSarvamSynthesizer({
+    baseUrl: 'https://sarvam.test',
+    apiKey: 'test-key',
+    retryDelayMs: 1,
+    sleep: async () => undefined,
+    logger: () => undefined,
+    fetcher: async () => {
+      callCount += 1;
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return callCount === 1
+            ? { audios: ['not valid base64'] }
+            : { audios: [audio.toString('base64')] };
+        },
+      };
+    },
+  });
+
+  const result = await synthesizer.synthesize({
+    text: 'Agla kadam.',
+    language: 'hi-IN',
+  });
+
+  assert.deepEqual([...result.audio], [...audio]);
+  assert.equal(callCount, 2);
 });
 
 test('Sarvam adapters do not retry permanent provider rejections', async () => {

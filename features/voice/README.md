@@ -26,7 +26,18 @@ interface TextToSpeech {
   synthesize(input: {
     text: string;
     language?: string;
-  }): Promise<ArrayBuffer>;
+  }): Promise<{
+    audio: ArrayBuffer;
+    mimeType: string;
+  }>;
+}
+
+interface AudioPlayback {
+  play(audio: {
+    audio: ArrayBuffer;
+    mimeType: string;
+  }): Promise<void>;
+  cancel(): void;
 }
 ```
 
@@ -44,10 +55,11 @@ boundary.
 `createSpeechApiClient` calls only `/speech/transcribe` and
 `/speech/synthesize`; provider credentials never enter the extension bundle.
 Development transcripts, a browser `MediaRecorder` adapter, and browser audio
-playback are available for deterministic integration work. The backend Sarvam
-adapter uses Bulbul v3's `target_language_code` request field and applies a
-bounded retry policy to transient network, rate-limit, and 5xx failures. Run
-the focused tests with:
+playback are available for deterministic integration work. Synthesized audio
+keeps the backend response MIME type through to browser playback. The backend
+Sarvam adapter uses Bulbul v3's `language_code` request field and applies a
+bounded retry policy to transient network, rate-limit, 5xx, and malformed audio
+responses. Run the focused tests with:
 
 ```sh
 cd apps/extension

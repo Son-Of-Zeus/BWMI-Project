@@ -14,7 +14,7 @@ The extension must guide the user without taking control of consequential action
 
 ## Project Status
 
-The mock portal is complete and should be treated as a read-only integration target at `http://localhost:5173`. The core extension mechanics and a local Gemini/Sarvam-backed backend boundary are implemented; deployment is deferred. Ongoing development must stay within the Chrome extension, backend, and supporting feature modules. Do not add portal functionality or extension-specific hooks to the site.
+The mock portal is complete and should be treated as a read-only integration target at `http://localhost:5173`. The core extension mechanics and a local Groq/Sarvam-backed backend boundary are implemented; deployment is deferred. Ongoing development must stay within the Chrome extension, backend, and supporting feature modules. Do not add portal functionality or extension-specific hooks to the site.
 
 ---
 
@@ -48,7 +48,7 @@ project/
 │   ├── package.json
 │   ├── src/
 │   │   ├── contracts.js
-│   │   ├── gemini-adapter.js
+│   │   ├── groq-adapter.js
 │   │   ├── sarvam-adapters.js
 │   │   ├── prototype-adapters.js
 │   │   └── server.js
@@ -449,7 +449,7 @@ Do not mix companion animation state with workflow/session state.
 ### Backend
 
 - Minimal server-side API
-- Google Gemini direct API with structured output
+- Groq Chat Completions API with JSON response mode
 - Sarvam AI for STT/TTS
 - no database required for the first demo
 
@@ -548,7 +548,7 @@ The MVP is successful when:
 9. Initial semantic extraction is DOM/accessibility based, not vision based.
 10. The extension scans common interactive elements and applies limited nearby-context heuristics for poor markup.
 11. The first demo does not promise robust support for arbitrary legacy government websites.
-12. Google Gemini provides the real LLM target-selection endpoint in the final MVP demo.
+12. Groq provides the real LLM target-selection endpoint in the final MVP demo.
 13. A mock reasoner may exist only as a development/test adapter.
 14. Sarvam AI provides STT/TTS in the final MVP demo.
 15. Voice APIs and model APIs are called through a backend so secrets are never shipped inside the extension.

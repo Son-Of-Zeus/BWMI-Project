@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createBrowserMicrophoneRecorder,
+  createBrowserAudioPlayback,
   createDevelopmentSpeechToText,
   createSpeechApiClient,
   createVoiceController,
@@ -8,6 +9,7 @@ import {
   type AudioRecorder,
   type SpeechToText,
   type SpeechToTextResult,
+  type SynthesizedAudio,
   type TextToSpeech,
 } from './voice';
 import { createSessionState } from '../session/session-state';
@@ -39,7 +41,10 @@ function createSpeechOutput() {
     cancel: vi.fn(),
   };
   const textToSpeech: TextToSpeech = {
-    synthesize: vi.fn(async () => new Uint8Array([1, 2, 3]).buffer),
+    synthesize: vi.fn(async (): Promise<SynthesizedAudio> => ({
+      audio: new Uint8Array([1, 2, 3]).buffer,
+      mimeType: 'audio/wav',
+    })),
   };
   return { playback, textToSpeech };
 }
@@ -48,6 +53,7 @@ function createResponse(options: {
   status?: number;
   json?: unknown;
   audio?: ArrayBuffer;
+  contentType?: string;
 } = {}): Response {
   const status = options.status ?? 200;
   return {
@@ -55,6 +61,12 @@ function createResponse(options: {
     status,
     json: async () => options.json,
     arrayBuffer: async () => options.audio ?? new ArrayBuffer(0),
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === 'content-type'
+          ? options.contentType ?? null
+          : null,
+    },
   } as Response;
 }
 
@@ -134,16 +146,19 @@ describe('voice controller', () => {
       language: 'hi-IN',
     });
     const output = createSpeechOutput();
-    let resolveFirstSpeech!: (audio: ArrayBuffer) => void;
+    let resolveFirstSpeech!: (audio: SynthesizedAudio) => void;
     output.textToSpeech.synthesize = vi
       .fn()
       .mockImplementationOnce(
         () =>
-          new Promise<ArrayBuffer>((resolve) => {
+          new Promise<SynthesizedAudio>((resolve) => {
             resolveFirstSpeech = resolve;
           }),
       )
-      .mockResolvedValue(new Uint8Array([4, 5]).buffer);
+      .mockResolvedValue({
+        audio: new Uint8Array([4, 5]).buffer,
+        mimeType: 'audio/wav',
+      });
     const controller = createVoiceController({
       recorder,
       speechToText,
@@ -153,7 +168,10 @@ describe('voice controller', () => {
 
     const firstSpeech = controller.say('Pehli instruction', 'hi-IN');
     const transcript = controller.listen();
-    resolveFirstSpeech(new Uint8Array([9]).buffer);
+    resolveFirstSpeech({
+      audio: new Uint8Array([9]).buffer,
+      mimeType: 'audio/wav',
+    });
 
     await expect(firstSpeech).resolves.toBeUndefined();
     await expect(transcript).resolves.toMatchObject({
@@ -179,12 +197,48 @@ describe('voice controller', () => {
       text: 'Online Services par click kariye.',
       language: 'hi-IN',
     });
-    expect(output.playback.play).toHaveBeenCalledWith(expect.any(ArrayBuffer));
+    expect(output.playback.play).toHaveBeenCalledWith({
+      audio: expect.any(ArrayBuffer),
+      mimeType: 'audio/wav',
+    });
     expect(controller.getState()).toBe('idle');
   });
 });
 
 describe('speech adapters', () => {
+  it('uses the synthesized audio MIME type for browser playback', async () => {
+    const createObjectURL = vi.fn((blob: Blob) => {
+      void blob;
+      return 'blob:test';
+    });
+    const revokeObjectURL = vi.fn();
+    class MockAudio {
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      pause = vi.fn();
+      removeAttribute = vi.fn();
+      play = vi.fn(async () => {
+        this.onended?.();
+      });
+    }
+
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    vi.stubGlobal('Audio', MockAudio);
+    try {
+      const playback = createBrowserAudioPlayback();
+      await playback.play({
+        audio: new Uint8Array([1, 2, 3]).buffer,
+        mimeType: 'audio/wav',
+      });
+
+      const blob = createObjectURL.mock.calls[0]![0];
+      expect(blob.type).toBe('audio/wav');
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:test');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('requests microphone permission through MediaRecorder and releases the stream after stopping', async () => {
     const track = { stop: vi.fn() } as unknown as MediaStreamTrack;
     const stream = {
@@ -239,7 +293,9 @@ describe('speech adapters', () => {
           json: { transcript: 'UAN kya hota hai?', language: 'hi-IN' },
         }),
       )
-      .mockResolvedValueOnce(createResponse({ audio: synthesized }));
+      .mockResolvedValueOnce(
+        createResponse({ audio: synthesized, contentType: 'audio/wav' }),
+      );
     const client = createSpeechApiClient({
       baseUrl: 'https://voice.example.test',
       fetcher,
@@ -251,7 +307,7 @@ describe('speech adapters', () => {
     });
     await expect(
       client.synthesize({ text: 'UAN samjhiye.', language: 'hi-IN' }),
-    ).resolves.toBe(synthesized);
+    ).resolves.toEqual({ audio: synthesized, mimeType: 'audio/wav' });
 
     const transcribeCall = fetcher.mock.calls[0] as [RequestInfo, RequestInit];
     const synthesizeCall = fetcher.mock.calls[1] as [RequestInfo, RequestInit];

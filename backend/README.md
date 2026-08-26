@@ -13,21 +13,22 @@ From `backend/`:
 
 ```sh
 npm test     # run the HTTP and adapter contract tests
-npm start    # run Gemini/Sarvam-backed API on 127.0.0.1:8787
+npm start    # run Groq/Sarvam-backed API on 127.0.0.1:8787
 PROTOTYPE_MODE=true npm start  # use deterministic adapters without provider keys
 ```
 
 When started with `npm start`, the backend automatically loads `backend/.env`
 if it exists. Shell environment variables still take precedence. Set `PORT`,
 `HOST`, or a comma-separated `ALLOWED_ORIGINS` when needed. The normal server
-calls Google's Gemini `generateContent` endpoint directly for
-reasoning and Sarvam REST APIs for speech. Configure `GEMINI_API_KEY`, with
-optional `GEMINI_MODEL` and `GEMINI_API_BASE_URL` overrides. The default Gemini
-model is `gemini-2.5-flash`; Sarvam model, speaker, and language settings are
-also environment-configurable. Speech requests automatically retry transient
+calls Groq's OpenAI-compatible Chat Completions endpoint directly for
+reasoning and Sarvam REST APIs for speech. Configure `GROQ_API_KEY`, with
+optional `GROQ_MODEL` and `GROQ_API_BASE_URL` overrides. The default Groq model
+is `openai/gpt-oss-120b`; Sarvam model, speaker, and language settings are also
+environment-configurable. Speech requests automatically retry transient
 network, rate-limit, and upstream server failures up to three times, respecting
-short `Retry-After` delays. Permanent provider rejections are returned without
-retrying. Set `SARVAM_LOG_RESPONSES=true` to log parsed STT and TTS provider
+short `Retry-After` delays. Reasoning requests use the Node HTTPS transport
+with IPv4 preference and the same bounded retry behavior. Permanent provider
+rejections are returned without retrying. Set `SARVAM_LOG_RESPONSES=true` to log parsed STT and TTS provider
 responses (including error bodies) in the backend console. TTS audio is logged
 as a compact base64-length summary instead of the full audio payload. STT logs
 can contain transcripts and timestamps, so disable them after debugging.
@@ -41,12 +42,12 @@ mode is retained for offline UI tests only and is not the final MVP path; real
 spoken phrases require the provider-backed STT adapter.
 
 The implementation is split into `src/contracts.js` (validation),
-`src/gemini-adapter.js` (reasoning), `src/sarvam-adapters.js` (speech),
+`src/groq-adapter.js` (reasoning), `src/sarvam-adapters.js` (speech),
 `src/prototype-adapters.js` (offline behavior), and `src/server.js` (HTTP
 transport). The backend test files cover transport, provider request shapes,
 response mapping, and safety boundaries.
 
-When the Gemini adapter is active, the backend logs `[Gemini call]`
+When the Groq adapter is active, the backend logs `[Groq call]`
 immediately before each reasoning request without logging the prompt or page
 context.
 
@@ -138,7 +139,7 @@ No database is needed for MVP.
 
 ## Definition of Done
 
-The extension can call Gemini and Sarvam through this boundary without
+The extension can call Groq and Sarvam through this boundary without
 exposing any third-party API key in its distributed bundle. Prototype
 reliability is sufficient for the local demo; authentication, retries,
 persistence, and production observability remain deferred with deployment.

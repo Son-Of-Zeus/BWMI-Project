@@ -25,11 +25,16 @@ export interface SpeechToText {
   transcribe(audio: Blob): Promise<SpeechToTextResult>;
 }
 
+export type SynthesizedAudio = {
+  audio: ArrayBuffer;
+  mimeType: string;
+};
+
 export interface TextToSpeech {
   synthesize(input: {
     text: string;
     language?: string;
-  }): Promise<ArrayBuffer>;
+  }): Promise<SynthesizedAudio>;
 }
 
 export type AudioRecorder = {
@@ -39,7 +44,7 @@ export type AudioRecorder = {
 };
 
 export type AudioPlayback = {
-  play(audio: ArrayBuffer): Promise<void>;
+  play(audio: SynthesizedAudio): Promise<void>;
   cancel(): void;
 };
 
@@ -396,7 +401,11 @@ export function createSpeechApiClient(
         }),
       });
       await requireOk(response, 'Text-to-speech request');
-      return response.arrayBuffer();
+      const contentType = response.headers?.get?.('content-type');
+      return {
+        audio: await response.arrayBuffer(),
+        mimeType: contentType?.split(';', 1)[0]?.trim() || 'audio/wav',
+      };
     },
   };
 }
@@ -614,10 +623,10 @@ export function createBrowserAudioPlayback(): AudioPlayback {
   };
 
   return {
-    play(audioBuffer) {
+    play(synthesizedAudio) {
       cancel();
       const url = URL.createObjectURL(
-        new Blob([audioBuffer], { type: 'audio/mpeg' }),
+        new Blob([synthesizedAudio.audio], { type: synthesizedAudio.mimeType }),
       );
       const audio = new Audio(url);
 

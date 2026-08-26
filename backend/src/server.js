@@ -12,7 +12,7 @@ import {
   validateSpeechResult,
   validateSynthesisInput,
 } from './contracts.js';
-import { createGeminiReasoner } from './gemini-adapter.js';
+import { createGroqReasoner } from './groq-adapter.js';
 import {
   createPrototypeReasoner,
   createPrototypeSynthesizer,
@@ -278,7 +278,7 @@ export function createBackendServer(options = {}) {
       options.reasoner ??
       (usePrototypeAdapters
         ? createPrototypeReasoner()
-        : createGeminiReasoner(options.gemini)),
+        : createGroqReasoner(options.groq)),
     transcriber:
       options.transcriber ??
       (usePrototypeAdapters
