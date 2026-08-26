@@ -12,7 +12,7 @@ import {
   validateSpeechResult,
   validateSynthesisInput,
 } from './contracts.js';
-import { createLiteLLMReasoner } from './litellm-adapter.js';
+import { createGeminiReasoner } from './gemini-adapter.js';
 import {
   createPrototypeReasoner,
   createPrototypeSynthesizer,
@@ -259,7 +259,7 @@ export function createBackendServer(options = {}) {
       options.reasoner ??
       (usePrototypeAdapters
         ? createPrototypeReasoner()
-        : createLiteLLMReasoner(options.litellm)),
+        : createGeminiReasoner(options.gemini)),
     transcriber:
       options.transcriber ??
       (usePrototypeAdapters

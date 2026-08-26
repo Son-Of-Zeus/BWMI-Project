@@ -8,15 +8,16 @@ preserving the extension's small, provider-neutral contracts.
 ## Current implementation
 
 `backend/src/server.js` exposes `POST /reason`, `POST /speech/transcribe`, and
-`POST /speech/synthesize`. The normal adapters call a local LiteLLM proxy and
-Sarvam's REST STT/TTS endpoints. `backend/src/contracts.js` validates
+`POST /speech/synthesize`. The normal adapters call Google's Gemini
+`generateContent` endpoint and Sarvam's REST STT/TTS endpoints. `backend/src/contracts.js` validates
 semantic-only requests, strict `GuideAction` responses, language hints,
 consequence text, and bounded speech payloads. Raw DOM references, disabled
 guide targets, unknown target IDs, and executable instruction text are rejected.
 
 Set `PROTOTYPE_MODE=true` to use deterministic offline adapters. The normal
-server requires `LITELLM_MODEL` and `SARVAM_API_KEY`; provider-specific details
-stay behind the same HTTP contract and extension code.
+server requires `GEMINI_API_KEY`, `GEMINI_MODEL` is optional, and
+`SARVAM_API_KEY`; provider-specific details stay behind the same HTTP contract
+and extension code.
 
 Run the backend tests from `backend/`:
 

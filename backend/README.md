@@ -13,16 +13,17 @@ From `backend/`:
 
 ```sh
 npm test     # run the HTTP and adapter contract tests
-npm start    # run LiteLLM/Sarvam-backed API on 127.0.0.1:8787
+npm start    # run Gemini/Sarvam-backed API on 127.0.0.1:8787
 PROTOTYPE_MODE=true npm start  # use deterministic adapters without provider keys
 ```
 
 Set `PORT`, `HOST`, or a comma-separated `ALLOWED_ORIGINS` when needed. The
-normal server uses a LiteLLM OpenAI-compatible `/chat/completions` endpoint for
-reasoning and Sarvam REST APIs for speech. Configure `LITELLM_BASE_URL`,
-`LITELLM_MODEL`, optional `LITELLM_API_KEY`, and `SARVAM_API_KEY`; Sarvam model,
-speaker, and language settings are also environment-configurable. Provider
-secrets stay in the backend process and never enter the extension bundle.
+normal server calls Google's Gemini `generateContent` endpoint directly for
+reasoning and Sarvam REST APIs for speech. Configure `GEMINI_API_KEY`, with
+optional `GEMINI_MODEL` and `GEMINI_API_BASE_URL` overrides. The default Gemini
+model is `gemini-2.5-flash`; Sarvam model, speaker, and language settings are
+also environment-configurable. Provider secrets stay in the backend process
+and never enter the extension bundle.
 
 `PROTOTYPE_MODE=true` explicitly selects the deterministic adapters: a PF
 transcript for the first voice turn, an “I'm done” transcript for the next
@@ -31,13 +32,14 @@ mode is retained for offline UI tests only and is not the final MVP path; real
 spoken phrases require the provider-backed STT adapter.
 
 The implementation is split into `src/contracts.js` (validation),
-`src/litellm-adapter.js` (reasoning), `src/sarvam-adapters.js` (speech),
+`src/gemini-adapter.js` (reasoning), `src/sarvam-adapters.js` (speech),
 `src/prototype-adapters.js` (offline behavior), and `src/server.js` (HTTP
 transport). The backend test files cover transport, provider request shapes,
 response mapping, and safety boundaries.
 
-When the LiteLLM adapter is active, the backend logs `[LLM call]` immediately
-before each provider request without logging the prompt or page context.
+When the Gemini adapter is active, the backend logs `[Gemini call]`
+immediately before each reasoning request without logging the prompt or page
+context.
 
 ## Endpoints
 
@@ -127,7 +129,7 @@ No database is needed for MVP.
 
 ## Definition of Done
 
-The extension can call LiteLLM and Sarvam through this boundary without
+The extension can call Gemini and Sarvam through this boundary without
 exposing any third-party API key in its distributed bundle. Prototype
 reliability is sufficient for the local demo; authentication, retries,
 persistence, and production observability remain deferred with deployment.

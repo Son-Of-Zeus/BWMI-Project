@@ -157,7 +157,7 @@ describe('extension runtime', () => {
     });
   });
 
-  it('defaults reasoning requests to the local LiteLLM-backed backend', async () => {
+  it('defaults reasoning requests to the local Gemini-backed backend', async () => {
     const harness = createHarness(undefined, undefined, undefined, true);
     harness.runtime.start();
 

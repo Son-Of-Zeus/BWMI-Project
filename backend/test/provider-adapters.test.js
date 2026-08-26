@@ -2,9 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { validateReasonRequest } from '../src/contracts.js';
-import {
-  createLiteLLMReasoner,
-} from '../src/litellm-adapter.js';
+import { createGeminiReasoner } from '../src/gemini-adapter.js';
 import {
   createSarvamSynthesizer,
   createSarvamTranscriber,
@@ -32,13 +30,13 @@ function createReasonRequest() {
   });
 }
 
-test('LiteLLM adapter sends an OpenAI-compatible structured reasoning request', async () => {
+test('Gemini adapter sends a direct structured reasoning request', async () => {
   let captured;
   const events = [];
-  const reasoner = createLiteLLMReasoner({
-    endpoint: 'http://litellm.test/v1',
-    model: 'demo-model',
-    apiKey: 'test-key',
+  const reasoner = createGeminiReasoner({
+    baseUrl: 'https://generativelanguage.test/v1beta',
+    model: 'gemini-2.5-flash',
+    apiKey: 'test-gemini-key',
     logger: (...args) => events.push(['log', args]),
     fetcher: async (url, init) => {
       events.push(['fetch']);
@@ -48,16 +46,20 @@ test('LiteLLM adapter sends an OpenAI-compatible structured reasoning request', 
         status: 200,
         async json() {
           return {
-            choices: [
+            candidates: [
               {
-                message: {
-                  content: JSON.stringify({
-                    action: 'guide',
-                    targetId: 'el_online',
-                    spokenInstruction: 'Online Services par click kariye.',
-                    expectedUserAction: 'click',
-                    language: 'hi-IN',
-                  }),
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify({
+                        action: 'guide',
+                        targetId: 'el_online',
+                        spokenInstruction: 'Online Services par click kariye.',
+                        expectedUserAction: 'click',
+                        language: 'hi-IN',
+                      }),
+                    },
+                  ],
                 },
               },
             ],
@@ -68,29 +70,48 @@ test('LiteLLM adapter sends an OpenAI-compatible structured reasoning request', 
   });
 
   await assert.doesNotReject(() => reasoner.reason(createReasonRequest()));
-  assert.deepEqual(events[0], ['log', ['[LLM call]']]);
+  assert.deepEqual(events[0], ['log', ['[Gemini call]']]);
   assert.deepEqual(events[1], ['fetch']);
-  assert.equal(captured.url, 'http://litellm.test/v1/chat/completions');
-  assert.equal(captured.init.headers.authorization, 'Bearer test-key');
+  assert.equal(
+    captured.url,
+    'https://generativelanguage.test/v1beta/models/gemini-2.5-flash:generateContent',
+  );
+  assert.equal(captured.init.headers['x-goog-api-key'], 'test-gemini-key');
 
   const payload = JSON.parse(captured.init.body);
-  assert.equal(payload.model, 'demo-model');
-  assert.equal(payload.temperature, 0);
-  assert.deepEqual(payload.response_format, { type: 'json_object' });
-  assert.equal(payload.messages[0].role, 'system');
-  assert.match(payload.messages[0].content, /targetId/);
-  assert.match(payload.messages[1].content, /Online Services/);
+  assert.equal(payload.generationConfig.temperature, 0);
+  assert.equal(payload.generationConfig.maxOutputTokens, 320);
+  assert.equal(payload.generationConfig.responseMimeType, 'application/json');
+  assert.match(payload.systemInstruction.parts[0].text, /targetId/);
+  assert.equal(payload.contents[0].role, 'user');
+  assert.match(payload.contents[0].parts[0].text, /Online Services/);
 });
 
-test('LiteLLM adapter rejects non-JSON assistant content', async () => {
-  const reasoner = createLiteLLMReasoner({
-    endpoint: 'http://litellm.test/chat/completions',
-    model: 'demo-model',
+test('Gemini adapter fails clearly when the provider key is absent', async () => {
+  const reasoner = createGeminiReasoner({
+    baseUrl: 'https://generativelanguage.test/v1beta',
+    fetcher: async () => {
+      throw new Error('fetch should not run');
+    },
+  });
+
+  await assert.rejects(
+    () => reasoner.reason(createReasonRequest()),
+    /GEMINI_API_KEY/,
+  );
+});
+
+test('Gemini adapter rejects non-JSON model content', async () => {
+  const reasoner = createGeminiReasoner({
+    baseUrl: 'https://generativelanguage.test/v1beta',
+    apiKey: 'test-gemini-key',
     fetcher: async () => ({
       ok: true,
       status: 200,
       async json() {
-        return { choices: [{ message: { content: 'not-json' } }] };
+        return {
+          candidates: [{ content: { parts: [{ text: 'not-json' }] } }],
+        };
       },
     }),
   });

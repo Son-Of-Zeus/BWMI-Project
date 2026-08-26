@@ -137,4 +137,4 @@ or presented as demo UX.
 
 Installing the extension and visiting the local mock portal causes the companion
 to appear without any code changes to the portal. Live reasoning and voice
-require the backend's LiteLLM and Sarvam environment configuration.
+require the backend's Gemini and Sarvam environment configuration.
