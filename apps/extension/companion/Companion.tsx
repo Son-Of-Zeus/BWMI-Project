@@ -85,7 +85,9 @@ export default function Companion({ store }: CompanionProps) {
       className={[
         'companion-surface',
         `companion-surface--${snapshot.state}`,
-        targetSide ? `companion-surface--target-${targetSide}` : '',
+        targetSide
+          ? `companion-surface--target-${targetSide}`
+          : 'companion-surface--docked',
       ].filter(Boolean).join(' ')}
       aria-label="Voice companion"
       aria-busy={isBusy}

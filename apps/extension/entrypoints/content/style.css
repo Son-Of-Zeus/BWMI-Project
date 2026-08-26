@@ -117,6 +117,24 @@
   --companion-cursor-direction: -1;
 }
 
+.companion-surface--thinking.companion-surface--docked .companion-button {
+  position: absolute;
+  left: 7px;
+  top: 2px;
+  z-index: 1;
+  transform: scale(0.76);
+  filter: drop-shadow(0 3px 5px rgba(94, 10, 30, 0.28));
+}
+
+.companion-surface--thinking.companion-surface--docked .companion-button:hover {
+  transform: scale(0.79);
+}
+
+.companion-surface--thinking.companion-surface--docked .companion-panel {
+  width: 100%;
+  padding-left: 48px;
+}
+
 .companion-reset:hover {
   transform: translateY(-1px);
   background: rgba(197, 22, 54, 0.14);

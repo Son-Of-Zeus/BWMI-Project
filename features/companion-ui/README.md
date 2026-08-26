@@ -12,8 +12,11 @@ The extension implementation lives in `apps/extension/companion/`.
 `Companion.tsx` renders the eight required states as a red cursor with a compact
 attached status bubble, reset control, and expandable latency breakdown. The
 cursor moves beside the highlighted target and flips horizontally when it must
-sit on the target's left, keeping its tip closest to the control. The external
-store retains labeled-region, busy, live-status,
+sit on the target's left, keeping its tip closest to the control. During
+transcription and reasoning, when there is no live target yet, the cursor docks
+inside the status rectangle. Once a guide target is ready, it detaches and
+moves beside that element. The external store retains labeled-region, busy,
+live-status,
 retry, follow-up, demo-reset, and slow-work semantics. `companion-ui.ts`
 provides fixed-position, target-aligned focus-mask and red highlight layers
 plus guide-controller adapters. Overlay layers use `pointer-events: none`, and

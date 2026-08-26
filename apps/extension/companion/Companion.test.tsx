@@ -47,6 +47,8 @@ describe('Companion accessibility', () => {
       store.setState('thinking');
     });
     expect(surface.getAttribute('aria-busy')).toBe('true');
+    expect(surface.className).toContain('companion-surface--docked');
+    expect(surface.className).toContain('companion-surface--thinking');
     expect(button.getAttribute('aria-label')).toBe('Stop current guidance');
     expect(status.textContent).toContain('Thinking…');
 
@@ -94,6 +96,9 @@ describe('Companion accessibility', () => {
 
     expect(host.querySelector('[role="region"]')?.className).toContain(
       'companion-surface--target-left',
+    );
+    expect(host.querySelector('[role="region"]')?.className).not.toContain(
+      'companion-surface--docked',
     );
 
     root.unmount();
