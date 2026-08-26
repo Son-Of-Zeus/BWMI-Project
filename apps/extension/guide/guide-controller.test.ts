@@ -405,8 +405,9 @@ describe('guide controller', () => {
       expectedUserAction: 'click',
       language: 'en-IN',
     });
-    await Promise.resolve();
-    await Promise.resolve();
+    await vi.waitFor(() => {
+      expect(harness.speech.say).toHaveBeenCalledTimes(1);
+    });
     harness.controller.cancel();
     resolveSpeech();
 

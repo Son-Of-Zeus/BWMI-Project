@@ -96,6 +96,7 @@ function createHarness(
         }) as Response,
       )
     : undefined;
+  const latencyLogger = vi.fn();
   const runtime = createExtensionRuntime({
     document,
     companion,
@@ -112,6 +113,7 @@ function createHarness(
     debug,
     development,
     fetcher: backendFetcher,
+    latency: { logger: latencyLogger },
   });
 
   return {
@@ -123,6 +125,7 @@ function createHarness(
     playback,
     reasoner,
     backendFetcher,
+    latencyLogger,
     runtime,
     host,
   };
@@ -155,6 +158,18 @@ describe('extension runtime', () => {
       pendingAction: { targetId: 'el_1', expectedUserAction: 'click' },
       companionState: 'waiting',
     });
+    expect(harness.companion.getSnapshot().latencyMetrics.map(
+      (metric) => metric.stage,
+    )).toEqual(expect.arrayContaining([
+      'recording',
+      'speech-to-text',
+      'semantic-scan',
+      'reasoning',
+      'movement',
+      'text-to-speech',
+      'playback',
+    ]));
+    expect(harness.latencyLogger).toHaveBeenCalled();
   });
 
   it('defaults reasoning requests to the local Gemini-backed backend', async () => {
@@ -197,6 +212,33 @@ describe('extension runtime', () => {
     expect(reasonCalls).toBe(2);
     expect(harness.recorder.record).toHaveBeenCalledTimes(1);
     expect(harness.companion.getSnapshot().state).toBe('waiting');
+
+    harness.runtime.stop();
+    harness.companion.destroy();
+  });
+
+  it('uses a second companion press to explicitly stop active reasoning', async () => {
+    const harness = createHarness();
+    let resolveReason!: (action: GuideAction) => void;
+    harness.reasoner.reason = vi.fn(
+      () => new Promise<GuideAction>((resolve) => {
+        resolveReason = resolve;
+      }),
+    );
+    harness.runtime.start();
+
+    harness.companion.toggleListening();
+    await vi.waitFor(() => {
+      expect(harness.companion.getSnapshot().state).toBe('thinking');
+    });
+    harness.companion.toggleListening();
+
+    expect(harness.runtime.flow.getSnapshot().phase).toBe('idle');
+    expect(harness.companion.getSnapshot().state).toBe('idle');
+
+    resolveReason({ action: 'wait' });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(harness.runtime.flow.getSnapshot().phase).toBe('idle');
 
     harness.runtime.stop();
     harness.companion.destroy();

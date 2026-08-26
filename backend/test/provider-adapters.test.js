@@ -267,10 +267,13 @@ test('Sarvam STT adapter logs the provider response only when enabled', async ()
 
 test('Sarvam TTS adapter maps base64 WAV audio to a provider-neutral result', async () => {
   let captured;
+  const events = [];
   const audio = Buffer.from([82, 73, 70, 70]);
   const synthesizer = createSarvamSynthesizer({
     baseUrl: 'https://sarvam.test',
     apiKey: 'test-key',
+    logResponses: true,
+    logger: (...args) => events.push(args),
     fetcher: async (url, init) => {
       captured = { url, init };
       return {
@@ -294,10 +297,103 @@ test('Sarvam TTS adapter maps base64 WAV audio to a provider-neutral result', as
   assert.equal(captured.init.headers['api-subscription-key'], 'test-key');
   assert.deepEqual(JSON.parse(captured.init.body), {
     text: 'Online Services par click kariye.',
-    language_code: 'hi-IN',
+    target_language_code: 'hi-IN',
     model: 'bulbul:v3',
     speaker: 'shubh',
   });
+  assert.deepEqual(events, [
+    [
+      '[Sarvam response]',
+      {
+        service: 'Sarvam text-to-speech',
+        status: 200,
+        ok: true,
+        body: { audios: ['<base64 audio: 8 characters>'] },
+      },
+    ],
+  ]);
+});
+
+test('Sarvam adapters retry transient failures and honor Retry-After', async () => {
+  const delays = [];
+  const events = [];
+  let callCount = 0;
+  const synthesizer = createSarvamSynthesizer({
+    baseUrl: 'https://sarvam.test',
+    apiKey: 'test-key',
+    sleep: async (delayMs) => delays.push(delayMs),
+    logger: (...args) => events.push(args),
+    fetcher: async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return {
+          ok: false,
+          status: 429,
+          headers: { get: (name) => name === 'retry-after' ? '1' : null },
+          async json() {
+            return { error: 'rate limited' };
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return { audios: [Buffer.from([1, 2]).toString('base64')] };
+        },
+      };
+    },
+  });
+
+  const result = await synthesizer.synthesize({
+    text: 'Agla kadam.',
+    language: 'hi-IN',
+  });
+
+  assert.deepEqual([...result.audio], [1, 2]);
+  assert.equal(callCount, 2);
+  assert.deepEqual(delays, [1_000]);
+  assert.deepEqual(events, [
+    [
+      '[Sarvam retry]',
+      {
+        service: 'Sarvam text-to-speech',
+        attempt: 2,
+        delayMs: 1_000,
+        status: 429,
+      },
+    ],
+  ]);
+});
+
+test('Sarvam adapters do not retry permanent provider rejections', async () => {
+  let callCount = 0;
+  const transcriber = createSarvamTranscriber({
+    baseUrl: 'https://sarvam.test',
+    apiKey: 'test-key',
+    sleep: async () => assert.fail('sleep should not run'),
+    logger: () => undefined,
+    fetcher: async () => {
+      callCount += 1;
+      return {
+        ok: false,
+        status: 400,
+        headers: { get: () => null },
+        async json() {
+          return { error: 'invalid request' };
+        },
+      };
+    },
+  });
+
+  await assert.rejects(
+    () => transcriber.transcribe({
+      audio: Buffer.from([1]),
+      contentType: 'audio/webm',
+    }),
+    /HTTP 400/,
+  );
+  assert.equal(callCount, 1);
 });
 
 test('Sarvam adapters fail clearly when the provider key is absent', async () => {

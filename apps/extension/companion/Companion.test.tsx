@@ -11,6 +11,8 @@ describe('Companion accessibility', () => {
   it('uses action labels that describe stop, retry, follow-up, and start states', () => {
     expect(getCompanionButtonLabel('idle')).toBe('Start voice guidance');
     expect(getCompanionButtonLabel('listening')).toBe('Stop listening');
+    expect(getCompanionButtonLabel('thinking')).toBe('Stop current guidance');
+    expect(getCompanionButtonLabel('speaking')).toBe('Stop current guidance');
     expect(getCompanionButtonLabel('error')).toBe('Try voice guidance again');
     expect(getCompanionButtonLabel('waiting')).toBe('Ask a follow-up question');
     expect(getCompanionButtonLabel('success')).toBe(
@@ -43,7 +45,7 @@ describe('Companion accessibility', () => {
       store.setState('thinking');
     });
     expect(surface.getAttribute('aria-busy')).toBe('true');
-    expect(button.getAttribute('aria-label')).toBe('Start voice guidance');
+    expect(button.getAttribute('aria-label')).toBe('Stop current guidance');
     expect(status.textContent).toContain('Thinking…');
 
     await act(async () => {
@@ -89,6 +91,29 @@ describe('Companion accessibility', () => {
     });
 
     expect(resetHandler).toHaveBeenCalledTimes(1);
+    root.unmount();
+    store.destroy();
+  });
+
+  it('shows a compact expandable latency breakdown inside the companion', async () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+    store.recordLatency({ stage: 'speech-to-text', durationMs: 800 });
+    store.recordLatency({ stage: 'reasoning', durationMs: 1_200 });
+    const reactMount = document.createElement('div');
+    host.append(reactMount);
+    const root = ReactDOM.createRoot(reactMount);
+
+    await act(async () => {
+      root.render(<Companion store={store} />);
+    });
+
+    const details = host.querySelector('.companion-latency') as HTMLDetailsElement;
+    expect(details.querySelector('summary')?.textContent).toContain('2.0s measured');
+    expect(details.textContent).toContain('Speech recognition');
+    expect(details.textContent).toContain('Reasoning');
+
     root.unmount();
     store.destroy();
   });

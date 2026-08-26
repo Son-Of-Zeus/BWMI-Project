@@ -1,4 +1,9 @@
 import type { CompanionState, SessionStateStore } from '../session/session-state';
+import {
+  latencyDurationMs,
+  type LatencyMetric,
+  type LatencyStage,
+} from '../runtime/latency';
 
 export type VoiceState =
   | 'idle'
@@ -70,6 +75,8 @@ export type VoiceControllerOptions = {
   session?: SessionStateStore;
   onTranscript?: (result: SpeechToTextResult) => void;
   onError?: (error: Error) => void;
+  onLatency?: (metric: LatencyMetric) => void;
+  now?: () => number;
 };
 
 export type VoiceController = {
@@ -141,6 +148,22 @@ export function createVoiceController(
   let state: VoiceState = 'idle';
   let generation = 0;
   let activeGeneration: number | undefined;
+  const now = options.now ?? (() => performance.now());
+
+  const measure = async <Result>(
+    stage: LatencyStage,
+    operation: () => Promise<Result>,
+  ): Promise<Result> => {
+    const startedAt = now();
+    try {
+      return await operation();
+    } finally {
+      options.onLatency?.({
+        stage,
+        durationMs: latencyDurationMs(startedAt, now()),
+      });
+    }
+  };
 
   const publish = (nextState: VoiceState) => {
     if (nextState === state) {
@@ -197,13 +220,14 @@ export function createVoiceController(
       publish('listening');
 
       try {
-        const audio = await options.recorder.record();
+        const audio = await measure('recording', () => options.recorder.record());
         if (!isCurrent(runGeneration)) {
           return { status: 'cancelled' };
         }
 
         publish('transcribing');
-        const result = await options.speechToText.transcribe(audio);
+        const result = await measure('speech-to-text', () =>
+          options.speechToText.transcribe(audio));
         if (!isCurrent(runGeneration)) {
           return { status: 'cancelled' };
         }
@@ -265,17 +289,18 @@ export function createVoiceController(
       publish('speaking');
 
       try {
-        const audio = await options.textToSpeech.synthesize({
-          text: normalizedText,
-          ...(optionalLanguage(language)
-            ? { language: optionalLanguage(language) }
-            : {}),
-        });
+        const audio = await measure('text-to-speech', () =>
+          options.textToSpeech!.synthesize({
+            text: normalizedText,
+            ...(optionalLanguage(language)
+              ? { language: optionalLanguage(language) }
+              : {}),
+          }));
         if (!isCurrent(runGeneration)) {
           return;
         }
 
-        await options.playback.play(audio);
+        await measure('playback', () => options.playback!.play(audio));
         if (isCurrent(runGeneration)) {
           publish('idle');
           finish(runGeneration);

@@ -355,10 +355,11 @@ describe('PF flow controller', () => {
     expect(harness.flow.getSnapshot().phase).toBe('success');
   });
 
-  it('recovers after an unexpected action while preserving the pending workflow', async () => {
-    const harness = createHarness([guideAction, { action: 'wait' }]);
+  it('keeps guidance active after an unmatched page interaction', async () => {
+    const harness = createHarness([guideAction]);
     harness.flow.start();
     await harness.flow.requestVoice();
+    const cancelCallCount = vi.mocked(harness.guide.cancel).mock.calls.length;
 
     const unexpectedButton = document.createElement('button');
     unexpectedButton.textContent = 'Claim Status';
@@ -375,22 +376,49 @@ describe('PF flow controller', () => {
     });
     await new Promise((resolve) => setTimeout(resolve, 5));
 
-    expect(harness.reasoner.reason).toHaveBeenCalledTimes(2);
-    expect(harness.reasoner.reason).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        session: expect.objectContaining({
-          pendingAction: {
-            type: 'click',
-            targetLabel: 'Online Services',
-          },
-        }),
-      }),
-    );
-    expect(harness.guide.cancel).toHaveBeenLastCalledWith({
-      preservePendingAction: true,
-    });
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+    expect(harness.guide.cancel).toHaveBeenCalledTimes(cancelCallCount);
     expect(harness.session.getState()).toMatchObject({
       pendingAction: { targetId: 'el_1', expectedUserAction: 'click' },
+    });
+    expect(harness.flow.getSnapshot().phase).toBe('waiting');
+  });
+
+  it('does not cancel an input guide while the user clicks or types in the field', async () => {
+    const inputAction: GuideAction = {
+      ...guideAction,
+      expectedUserAction: 'input',
+    };
+    const harness = createHarness([inputAction]);
+    harness.flow.start();
+    await harness.flow.requestVoice();
+    const cancelCallCount = vi.mocked(harness.guide.cancel).mock.calls.length;
+
+    harness.interactions.emit({
+      type: 'click',
+      action: 'click',
+      targetId: 'el_1',
+      label: 'UAN',
+      matchedPending: false,
+      timestamp: 1,
+    });
+    harness.interactions.emit({
+      type: 'input-complete',
+      action: 'input',
+      targetId: 'el_1',
+      label: 'UAN',
+      matchedPending: false,
+      hasValue: true,
+      validationState: 'valid',
+      timestamp: 2,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.guide.cancel).toHaveBeenCalledTimes(cancelCallCount);
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+    expect(harness.session.getState().pendingAction).toEqual({
+      targetId: 'el_1',
+      expectedUserAction: 'input',
     });
     expect(harness.flow.getSnapshot().phase).toBe('waiting');
   });

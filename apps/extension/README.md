@@ -20,7 +20,17 @@ npm run dev
 npm run build
 ```
 
-The companion control is wired to the extension runtime and exposes accessible state, retry, follow-up, demo-reset, and slow-work semantics. The DOM semantic layer scans accessible interactive candidates, infers bounded labels and section context, tracks visibility separately from viewport position, and exposes a debounced `MutationObserver` scanner. Session state, action observation, reasoning, guidance, voice, safety, flow orchestration, runtime composition, accessibility, demo reset, loading latency, and error recovery are covered by their respective feature boundaries.
+The compact red companion control is wired to the extension runtime and
+exposes accessible state, retry, follow-up, explicit busy-operation stop,
+demo-reset, slow-work semantics, and an expandable per-stage latency
+breakdown. Unmatched page clicks and text entry no longer dismiss active
+guidance. The DOM semantic layer scans accessible interactive candidates,
+infers bounded labels and section context, tracks visibility separately from
+viewport position, and exposes a debounced `MutationObserver` scanner.
+Session state, action observation, reasoning, guidance, voice, safety, flow
+orchestration, runtime composition, accessibility, demo reset, loading
+latency, and error recovery are covered by their respective feature
+boundaries.
 
 ## Responsibilities
 

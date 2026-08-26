@@ -5,6 +5,7 @@ import {
   type CompanionUiStore,
 } from './companion-ui';
 import type { CompanionState } from '../session/session-state';
+import { LATENCY_STAGE_LABELS } from '../runtime/latency';
 
 export const COMPANION_STATUS_ID = 'voice-companion-status';
 
@@ -12,6 +13,10 @@ export function getCompanionButtonLabel(state: CompanionState): string {
   switch (state) {
     case 'listening':
       return 'Stop listening';
+    case 'thinking':
+    case 'guiding':
+    case 'speaking':
+      return 'Stop current guidance';
     case 'error':
       return 'Try voice guidance again';
     case 'success':
@@ -25,6 +30,13 @@ export function getCompanionButtonLabel(state: CompanionState): string {
 
 function isBusyState(state: CompanionState): boolean {
   return state === 'listening' || state === 'thinking' || state === 'speaking';
+}
+
+function formatLatency(durationMs: number): string {
+  if (durationMs >= 1_000) {
+    return `${(durationMs / 1_000).toFixed(1)}s`;
+  }
+  return `${Math.round(durationMs)}ms`;
 }
 
 type CompanionProps = {
@@ -42,6 +54,10 @@ export default function Companion({ store }: CompanionProps) {
   const statusLabel = snapshot.latencyNotice
     ? 'Still working…'
     : COMPANION_STATE_LABELS[snapshot.state];
+  const measuredTotalMs = snapshot.latencyMetrics.reduce(
+    (total, metric) => total + metric.durationMs,
+    0,
+  );
   const viewport = {
     width: window.innerWidth,
     height: window.innerHeight,
@@ -79,6 +95,34 @@ export default function Companion({ store }: CompanionProps) {
       >
         <span className="companion-orb" aria-hidden="true" />
       </button>
+      <div className="companion-copy">
+        <span
+          className="companion-status"
+          id={COMPANION_STATUS_ID}
+          role="status"
+          aria-live={snapshot.state === 'error' ? 'assertive' : 'polite'}
+          aria-atomic="true"
+        >
+          {statusLabel}
+        </span>
+        {snapshot.latencyMetrics.length > 0 ? (
+          <details className="companion-latency">
+            <summary aria-label="Show latency breakdown">
+              {formatLatency(measuredTotalMs)} measured
+            </summary>
+            <ul className="companion-latency-popover">
+              {snapshot.latencyMetrics.map((metric, index) => (
+                <li key={`${metric.stage}-${index}`}>
+                  <span>{LATENCY_STAGE_LABELS[metric.stage]}</span>
+                  <strong>{formatLatency(metric.durationMs)}</strong>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : (
+          <span className="companion-hint">Tap to speak</span>
+        )}
+      </div>
       <button
         className="companion-reset"
         type="button"
@@ -88,15 +132,6 @@ export default function Companion({ store }: CompanionProps) {
       >
         <span aria-hidden="true">↺</span>
       </button>
-      <span
-        className="companion-status"
-        id={COMPANION_STATUS_ID}
-        role="status"
-        aria-live={snapshot.state === 'error' ? 'assertive' : 'polite'}
-        aria-atomic="true"
-      >
-        {statusLabel}
-      </span>
     </section>
   );
 }

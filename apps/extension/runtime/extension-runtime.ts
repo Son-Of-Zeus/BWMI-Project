@@ -45,6 +45,10 @@ import {
   type FlowPhase,
 } from '../flow/flow-controller';
 import type { CompanionUiStore } from '../companion/companion-ui';
+import {
+  LATENCY_STAGE_LABELS,
+  type LatencyMetric,
+} from './latency';
 
 export type ExtensionRuntimeOptions = {
   document?: Document;
@@ -66,6 +70,7 @@ export type ExtensionRuntimeOptions = {
   loadingLatencyNoticeMs?: number;
   development?: ExtensionDevelopmentOptions;
   debug?: ExtensionDebugOptions;
+  latency?: ExtensionLatencyOptions;
 };
 
 export const DEFAULT_LOADING_LATENCY_NOTICE_MS = 1200;
@@ -95,6 +100,12 @@ export type ExtensionDebugOptions = {
   logSnapshots?: boolean;
   debugTargetBoxes?: boolean;
   logger?: (event: ExtensionDebugEvent) => void;
+};
+
+export type ExtensionLatencyOptions = {
+  enabled?: boolean;
+  logger?: (metric: LatencyMetric) => void;
+  now?: () => number;
 };
 
 export type ExtensionRuntime = {
@@ -144,6 +155,13 @@ function defaultDebugLogger(event: ExtensionDebugEvent): void {
   console.debug('[Voice Companion]', event);
 }
 
+function defaultLatencyLogger(metric: LatencyMetric): void {
+  console.log('[Voice Companion latency]', {
+    stage: LATENCY_STAGE_LABELS[metric.stage],
+    durationMs: metric.durationMs,
+  });
+}
+
 export function createExtensionRuntime(
   options: ExtensionRuntimeOptions,
 ): ExtensionRuntime {
@@ -155,6 +173,16 @@ export function createExtensionRuntime(
   const debugLogger = debug?.logger ?? defaultDebugLogger;
   const logSnapshots = debug?.logSnapshots !== false;
   const debugTargetBoxes = debug?.debugTargetBoxes !== false;
+  const latencyEnabled = options.latency?.enabled !== false;
+  const latencyLogger = options.latency?.logger ?? defaultLatencyLogger;
+  let latencyRunActive = false;
+  const recordLatency = (metric: LatencyMetric) => {
+    if (!latencyEnabled || !latencyRunActive) {
+      return;
+    }
+    options.companion.recordLatency(metric);
+    latencyLogger(metric);
+  };
   const emitDebugSnapshot = (page: ReasoningPage) => {
     if (debug && logSnapshots) {
       debugLogger({
@@ -195,6 +223,8 @@ export function createExtensionRuntime(
     textToSpeech: options.textToSpeech ?? speechClient,
     playback: options.playback ?? createBrowserAudioPlayback(),
     session,
+    onLatency: recordLatency,
+    now: options.latency?.now,
   });
   const guide = createGuideController({
     document: documentNode,
@@ -208,6 +238,8 @@ export function createExtensionRuntime(
     waitForLayout: options.waitForLayout,
     waitForMovement: options.waitForMovement,
     onTargetRect: emitDebugTargetBox,
+    onLatency: recordLatency,
+    now: options.latency?.now,
   });
   const reasoner =
     options.reasoner ??
@@ -227,6 +259,8 @@ export function createExtensionRuntime(
     voice,
     waitForPageSettled: options.waitForPageSettled,
     onPageSnapshot: emitDebugSnapshot,
+    onLatency: recordLatency,
+    now: options.latency?.now,
   });
   const loadingLatencyNoticeMs = Math.max(
     0,
@@ -276,6 +310,20 @@ export function createExtensionRuntime(
       voice.stopListening();
       return;
     }
+    if (
+      voice.getState() === 'transcribing' ||
+      voice.getState() === 'thinking' ||
+      voice.getState() === 'guiding' ||
+      voice.getState() === 'speaking' ||
+      flow.getSnapshot().phase === 'thinking' ||
+      flow.getSnapshot().phase === 'guiding'
+    ) {
+      latencyRunActive = false;
+      flow.cancel();
+      return;
+    }
+    latencyRunActive = true;
+    options.companion.clearLatencyMetrics();
     if (flow.getSnapshot().phase === 'error') {
       void flow.retry();
       return;
@@ -284,6 +332,8 @@ export function createExtensionRuntime(
   };
   const handleReset = () => {
     clearLatencyNotice();
+    latencyRunActive = false;
+    options.companion.clearLatencyMetrics();
     flow.reset();
   };
   options.companion.setListeningHandler(handleListening);
@@ -304,6 +354,7 @@ export function createExtensionRuntime(
         return;
       }
       started = true;
+      latencyRunActive = false;
       unsubscribeVoice = voice.subscribe((state) => {
         publishCompanionState(toCompanionState(state));
       });
@@ -316,6 +367,7 @@ export function createExtensionRuntime(
       options.companion.setListeningHandler(handleListening);
       options.companion.setResetHandler(handleReset);
       flow.start();
+      options.companion.clearLatencyMetrics();
     },
 
     stop() {
@@ -323,7 +375,9 @@ export function createExtensionRuntime(
         return;
       }
       started = false;
+      latencyRunActive = false;
       clearLatencyNotice();
+      options.companion.clearLatencyMetrics();
       flow.stop();
       options.companion.setListeningHandler(undefined);
       options.companion.setResetHandler(undefined);
@@ -335,6 +389,8 @@ export function createExtensionRuntime(
 
     reset() {
       clearLatencyNotice();
+      latencyRunActive = false;
+      options.companion.clearLatencyMetrics();
       flow.reset();
     },
   };

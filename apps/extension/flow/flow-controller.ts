@@ -21,6 +21,11 @@ import type {
   VoiceController,
   VoiceResult,
 } from '../voice/voice';
+import {
+  latencyDurationMs,
+  type LatencyMetric,
+  type LatencyStage,
+} from '../runtime/latency';
 
 export type FlowPhase =
   | 'stopped'
@@ -63,6 +68,8 @@ export type FlowControllerOptions = {
   waitForPageSettled?: () => Promise<void>;
   onPageSnapshot?: (page: ReasoningPage) => void;
   onError?: (error: Error) => void;
+  onLatency?: (metric: LatencyMetric) => void;
+  now?: () => number;
 };
 
 export type FlowController = {
@@ -178,6 +185,37 @@ export function createFlowController(
   let pageSubscription: (() => void) | undefined;
   let interactionSubscription: (() => void) | undefined;
   let continuationTimer: ReturnType<typeof setTimeout> | undefined;
+  const now = options.now ?? (() => performance.now());
+
+  const measure = async <Result>(
+    stage: LatencyStage,
+    operation: () => Promise<Result>,
+  ): Promise<Result> => {
+    const startedAt = now();
+    try {
+      return await operation();
+    } finally {
+      options.onLatency?.({
+        stage,
+        durationMs: latencyDurationMs(startedAt, now()),
+      });
+    }
+  };
+
+  const measureSync = <Result>(
+    stage: LatencyStage,
+    operation: () => Result,
+  ): Result => {
+    const startedAt = now();
+    try {
+      return operation();
+    } finally {
+      options.onLatency?.({
+        stage,
+        durationMs: latencyDurationMs(startedAt, now()),
+      });
+    }
+  };
 
   const publish = (nextSnapshot: FlowSnapshot) => {
     snapshot = nextSnapshot;
@@ -194,9 +232,11 @@ export function createFlowController(
   };
 
   const refresh = (): ReasoningPage => {
-    const semanticSnapshot = options.scanner.scan();
-    options.registry.reconcile(discoverSemanticElements(documentNode));
-    const page = pageFromSnapshot(semanticSnapshot, options.registry);
+    const page = measureSync('semantic-scan', () => {
+      const semanticSnapshot = options.scanner.scan();
+      options.registry.reconcile(discoverSemanticElements(documentNode));
+      return pageFromSnapshot(semanticSnapshot, options.registry);
+    });
     options.onPageSnapshot?.(page);
     publish({ ...snapshot, page });
     return page;
@@ -298,14 +338,15 @@ export function createFlowController(
     setPhase('thinking');
     try {
       const page = refresh();
-      const action = await options.reasoner.reason(
-        buildReasonRequest({
-          userUtterance: transcript.transcript,
-          language: transcript.language,
-          session: options.session.getState(),
-          page,
-        }),
-      );
+      const action = await measure('reasoning', () =>
+        options.reasoner.reason(
+          buildReasonRequest({
+            userUtterance: transcript.transcript,
+            language: transcript.language,
+            session: options.session.getState(),
+            page,
+          }),
+        ));
       if (!isCurrent(runGeneration)) {
         return { status: 'cancelled' };
       }
@@ -334,7 +375,7 @@ export function createFlowController(
     }
 
     const runGeneration = beginRun();
-    await waitForPageSettled();
+    await measure('page-settle', waitForPageSettled);
     if (!isCurrent(runGeneration) || !snapshot.lastTranscript) {
       return;
     }
@@ -377,10 +418,9 @@ export function createFlowController(
       return;
     }
 
-    if (options.session.getState().pendingAction) {
-      options.guide.cancel({ preservePendingAction: true });
-      scheduleContinuation();
-    }
+    // Unmatched page activity is not a stop signal. In particular, clicking
+    // and typing in a guided input must leave the highlight and pending step
+    // intact until the user explicitly returns to the companion control.
   };
 
   const clearRetryTranscript = () => {

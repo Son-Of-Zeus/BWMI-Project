@@ -1,9 +1,11 @@
 import type { GuideCompanion, GuideOverlay } from '../guide/guide-controller';
 import type { CompanionState } from '../session/session-state';
+import type { LatencyMetric } from '../runtime/latency';
 
 export type CompanionUiSnapshot = {
   state: CompanionState;
   latencyNotice: boolean;
+  latencyMetrics: readonly LatencyMetric[];
   targetRect: DOMRect | null;
   focusMaskActive: boolean;
   highlightRect: DOMRect | null;
@@ -33,14 +35,16 @@ export type CompanionUiStore = GuideOverlay &
     setListeningHandler(handler?: () => void): void;
     setResetHandler(handler?: () => void): void;
     setLatencyNotice(active: boolean): void;
+    clearLatencyMetrics(): void;
+    recordLatency(metric: LatencyMetric): void;
     toggleListening(): void;
     resetDemo(): void;
     destroy(): void;
   };
 
 export const DEFAULT_COMPANION_DIMENSIONS: CompanionDimensions = {
-  width: 64,
-  height: 64,
+  width: 248,
+  height: 72,
   edgePadding: 16,
   targetGap: 16,
 };
@@ -112,6 +116,7 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
   let snapshot: CompanionUiSnapshot = {
     state: 'idle',
     latencyNotice: false,
+    latencyMetrics: [],
     targetRect: null,
     focusMaskActive: false,
     highlightRect: null,
@@ -164,6 +169,20 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
       publish({ ...snapshot, latencyNotice: active });
     },
 
+    clearLatencyMetrics() {
+      if (snapshot.latencyMetrics.length === 0) {
+        return;
+      }
+      publish({ ...snapshot, latencyMetrics: [] });
+    },
+
+    recordLatency(metric) {
+      publish({
+        ...snapshot,
+        latencyMetrics: [...snapshot.latencyMetrics.slice(-11), metric],
+      });
+    },
+
     toggleListening() {
       if (listeningHandler) {
         listeningHandler();
@@ -180,6 +199,7 @@ export function createCompanionUiStore(host: HTMLElement): CompanionUiStore {
 
       store.clear();
       store.setLatencyNotice(false);
+      store.clearLatencyMetrics();
       setState('idle');
     },
 

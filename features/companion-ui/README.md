@@ -8,7 +8,15 @@ The companion is not the mouse pointer and must never replace the system cursor.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/companion/`. `Companion.tsx` renders the eight required states through an external UI store with labeled region, busy, live-status, retry, follow-up, demo-reset, and slow-work semantics, while `companion-ui.ts` provides fixed-position, target-aligned focus-mask and highlight layers plus guide-controller adapters. Overlay layers use `pointer-events: none`, and position/motion helpers clamp the companion to the viewport, use calm transition timing, and respect reduced motion.
+The extension implementation lives in `apps/extension/companion/`.
+`Companion.tsx` renders the eight required states as one compact red card with
+an integrated microphone, status, reset control, and expandable latency
+breakdown. The external store retains labeled-region, busy, live-status,
+retry, follow-up, demo-reset, and slow-work semantics. `companion-ui.ts`
+provides fixed-position, target-aligned focus-mask and red highlight layers
+plus guide-controller adapters. Overlay layers use `pointer-events: none`, and
+position/motion helpers clamp the wider card to the viewport, use calm
+transition timing, and respect reduced motion.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -33,12 +41,13 @@ error
 
 Recommended MVP form:
 
-- small orb / intelligent dot
+- compact red card with a small orb / intelligent dot
 - calm scale or glow changes
 - subtle directional motion
 - no character animation dependency
 - no excessive bouncing
 - clear contrast against the page
+- controls contained within one surface rather than separate floating pills
 
 ## Guiding Sequence
 

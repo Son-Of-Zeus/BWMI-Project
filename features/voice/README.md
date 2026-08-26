@@ -44,8 +44,10 @@ boundary.
 `createSpeechApiClient` calls only `/speech/transcribe` and
 `/speech/synthesize`; provider credentials never enter the extension bundle.
 Development transcripts, a browser `MediaRecorder` adapter, and browser audio
-playback are available for deterministic integration work. Run the focused
-tests with:
+playback are available for deterministic integration work. The backend Sarvam
+adapter uses Bulbul v3's `target_language_code` request field and applies a
+bounded retry policy to transient network, rate-limit, and 5xx failures. Run
+the focused tests with:
 
 ```sh
 cd apps/extension

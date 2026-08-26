@@ -30,14 +30,14 @@ describe('companion UI', () => {
         width: 1200,
         height: 800,
       }),
-    ).toEqual({ left: 316, top: 98 });
+    ).toEqual({ left: 316, top: 94 });
 
     expect(
       getCompanionPosition(rect(100, 160, 1080, 1180), {
         width: 1200,
         height: 800,
       }),
-    ).toEqual({ left: 1000, top: 98 });
+    ).toEqual({ left: 816, top: 94 });
   });
 
   it('clamps the companion inside the viewport edges', () => {
@@ -84,6 +84,23 @@ describe('companion UI', () => {
       state: 'error',
       latencyNotice: false,
     });
+  });
+
+  it('records a bounded latency breakdown and clears it for a new run', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const store = createCompanionUiStore(host);
+
+    store.recordLatency({ stage: 'speech-to-text', durationMs: 820.4 });
+    store.recordLatency({ stage: 'reasoning', durationMs: 1_240.2 });
+
+    expect(store.getSnapshot().latencyMetrics).toEqual([
+      { stage: 'speech-to-text', durationMs: 820.4 },
+      { stage: 'reasoning', durationMs: 1_240.2 },
+    ]);
+
+    store.clearLatencyMetrics();
+    expect(store.getSnapshot().latencyMetrics).toEqual([]);
   });
 
   it('creates pointer-transparent focus and highlight layers without changing page styles', () => {

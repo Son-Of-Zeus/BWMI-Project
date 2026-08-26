@@ -24,11 +24,15 @@ calls Google's Gemini `generateContent` endpoint directly for
 reasoning and Sarvam REST APIs for speech. Configure `GEMINI_API_KEY`, with
 optional `GEMINI_MODEL` and `GEMINI_API_BASE_URL` overrides. The default Gemini
 model is `gemini-2.5-flash`; Sarvam model, speaker, and language settings are
-also environment-configurable. Set `SARVAM_LOG_RESPONSES=true` temporarily to
-log the parsed Sarvam speech-to-text response (including provider error bodies)
-while debugging; responses can contain transcripts and timestamps, so disable
-it afterward. Provider secrets stay in the backend process and never enter the
-extension bundle.
+also environment-configurable. Speech requests automatically retry transient
+network, rate-limit, and upstream server failures up to three times, respecting
+short `Retry-After` delays. Permanent provider rejections are returned without
+retrying. Set `SARVAM_LOG_RESPONSES=true` to log parsed STT and TTS provider
+responses (including error bodies) in the backend console. TTS audio is logged
+as a compact base64-length summary instead of the full audio payload. STT logs
+can contain transcripts and timestamps, so disable them after debugging.
+Provider secrets stay in the backend process and never enter the extension
+bundle.
 
 `PROTOTYPE_MODE=true` explicitly selects the deterministic adapters: a PF
 transcript for the first voice turn, an “I'm done” transcript for the next

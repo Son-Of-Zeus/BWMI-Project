@@ -15,7 +15,7 @@
 .companion-focus-mask {
   z-index: 2147483645;
   border-radius: 14px;
-  --companion-mask-color: rgba(15, 23, 42, 0.34);
+  --companion-mask-color: rgba(42, 12, 19, 0.32);
   box-shadow: 0 0 0 100vmax var(--companion-mask-color);
   transition: left 180ms ease, top 180ms ease, width 180ms ease,
     height 180ms ease;
@@ -23,10 +23,10 @@
 
 .companion-highlight {
   z-index: 2147483646;
-  border: 2px solid #f4bf4f;
+  border: 2px solid #d11f43;
   border-radius: 12px;
-  box-shadow: 0 0 0 5px rgba(244, 191, 79, 0.28),
-    0 8px 24px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 0 0 5px rgba(209, 31, 67, 0.2),
+    0 8px 24px rgba(94, 10, 30, 0.18);
   transition: left 180ms ease, top 180ms ease, width 180ms ease,
     height 180ms ease;
 }
@@ -38,61 +38,73 @@
   z-index: 2147483647;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: #172033;
+  width: 248px;
+  min-height: 64px;
+  gap: 9px;
+  padding: 7px;
+  border: 1px solid rgba(197, 22, 54, 0.2);
+  border-radius: 18px;
+  color: #3f101a;
+  background: rgba(255, 250, 251, 0.97);
+  box-shadow: 0 14px 38px rgba(94, 10, 30, 0.18),
+    0 2px 8px rgba(94, 10, 30, 0.08);
+  backdrop-filter: blur(16px);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   pointer-events: auto;
-  transition: left 220ms ease, top 220ms ease, transform 180ms ease;
+  transition: left 220ms ease, top 220ms ease, transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .companion-button {
   display: grid;
-  width: 52px;
-  height: 52px;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
   padding: 0;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.9);
   border-radius: 999px;
-  background: #2457d6;
-  box-shadow: 0 10px 26px rgba(36, 87, 214, 0.32);
+  background: #c51636;
+  box-shadow: 0 8px 20px rgba(197, 22, 54, 0.3);
   cursor: pointer;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .companion-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(36, 87, 214, 0.4);
+  box-shadow: 0 10px 24px rgba(197, 22, 54, 0.4);
 }
 
 .companion-button:focus-visible {
-  outline: 3px solid #f4bf4f;
+  outline: 3px solid #ff9bb0;
   outline-offset: 3px;
 }
 
 .companion-reset {
   display: grid;
-  width: 32px;
-  height: 32px;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
   padding: 0;
   place-items: center;
-  border: 1px solid rgba(23, 32, 51, 0.2);
+  border: 0;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  color: #172033;
+  background: rgba(197, 22, 54, 0.08);
+  color: #a1112c;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
 .companion-reset:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(23, 32, 51, 0.16);
+  background: rgba(197, 22, 54, 0.14);
 }
 
 .companion-reset:focus-visible {
-  outline: 3px solid #f4bf4f;
+  outline: 3px solid #ff9bb0;
   outline-offset: 3px;
 }
 
@@ -102,7 +114,7 @@
     border: 2px solid #111827;
   }
 
-  .companion-status {
+  .companion-surface {
     border-color: #111827;
     color: #111827;
     background: #ffffff;
@@ -150,8 +162,8 @@
 
 .companion-button--listening,
 .companion-surface--listening .companion-button {
-  background: #b3314b;
-  box-shadow: 0 10px 26px rgba(179, 49, 75, 0.32);
+  background: #8f1029;
+  box-shadow: 0 8px 22px rgba(143, 16, 41, 0.4);
 }
 
 .companion-surface--thinking .companion-orb,
@@ -161,37 +173,111 @@
 }
 
 .companion-surface--success .companion-button {
-  background: #1f8a5b;
+  background: #a1112c;
 }
 
 .companion-surface--error .companion-button {
-  background: #b3314b;
+  background: #7d0c22;
 }
 
 .companion-orb {
-  width: 17px;
-  height: 17px;
-  border: 4px solid rgba(255, 255, 255, 0.95);
+  width: 15px;
+  height: 15px;
+  border: 3px solid rgba(255, 255, 255, 0.96);
   border-radius: 50%;
   box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.16);
 }
 
+.companion-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .companion-status {
-  max-width: 130px;
-  padding: 7px 10px;
-  border: 1px solid rgba(23, 32, 51, 0.1);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 6px 18px rgba(23, 32, 51, 0.12);
+  overflow: hidden;
+  color: #48121e;
   font-size: 12px;
-  font-weight: 650;
-  line-height: 1;
+  font-weight: 750;
+  line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.companion-surface[data-companion-latency='slow'] .companion-status {
-  border-color: rgba(180, 119, 0, 0.42);
-  background: #fff8e1;
+.companion-hint {
+  color: #8b5d66;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.companion-latency {
+  position: relative;
+  width: fit-content;
+  color: #8f1029;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.companion-latency summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+
+.companion-latency summary::-webkit-details-marker {
+  display: none;
+}
+
+.companion-latency summary::after {
+  content: " · details";
+  color: #a77a83;
+  font-weight: 500;
+}
+
+.companion-latency summary:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid #ff9bb0;
+  outline-offset: 2px;
+}
+
+.companion-latency-popover {
+  position: absolute;
+  right: -39px;
+  bottom: calc(100% + 12px);
+  width: 230px;
+  max-height: 230px;
+  z-index: 1;
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 11px;
+  overflow: auto;
+  border: 1px solid rgba(197, 22, 54, 0.18);
+  border-radius: 14px;
+  background: rgba(255, 252, 252, 0.99);
+  box-shadow: 0 12px 32px rgba(94, 10, 30, 0.2);
+  list-style: none;
+}
+
+.companion-latency-popover li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #60303a;
+}
+
+.companion-latency-popover strong {
+  color: #8f1029;
+  font-variant-numeric: tabular-nums;
+}
+
+.companion-surface[data-companion-latency='slow'] {
+  border-color: rgba(197, 22, 54, 0.45);
+  box-shadow: 0 14px 38px rgba(94, 10, 30, 0.22),
+    0 0 0 3px rgba(197, 22, 54, 0.08);
 }
 
 @keyframes companion-pulse {

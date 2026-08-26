@@ -2,6 +2,11 @@ import type { CompanionState, SessionStateStore } from '../session/session-state
 import type { ElementRegistry, RegistryEntry } from '../registry/element-registry';
 import type { GuideAction } from '../reasoning/reasoning';
 import { evaluateGuideActionSafety } from '../safety/safety';
+import {
+  latencyDurationMs,
+  type LatencyMetric,
+  type LatencyStage,
+} from '../runtime/latency';
 
 export type Viewport = {
   width: number;
@@ -39,6 +44,8 @@ export type GuideControllerOptions = {
   waitForMovement?: () => Promise<void>;
   onTargetRect?: (targetId: string, rect: DOMRect) => void;
   onMissingTarget?: (targetId: string) => void;
+  onLatency?: (metric: LatencyMetric) => void;
+  now?: () => number;
 };
 
 export type GuideResult =
@@ -137,6 +144,22 @@ export function createGuideController(
   const waitForMovement =
     options.waitForMovement ??
     (() => defaultWaitForMovement(documentNode, prefersReducedMotion));
+  const now = options.now ?? (() => performance.now());
+
+  const measure = async <Result>(
+    stage: LatencyStage,
+    operation: () => Promise<Result>,
+  ): Promise<Result> => {
+    const startedAt = now();
+    try {
+      return await operation();
+    } finally {
+      options.onLatency?.({
+        stage,
+        durationMs: latencyDurationMs(startedAt, now()),
+      });
+    }
+  };
 
   let generation = 0;
   let activeCleanup: (() => void) | undefined;
@@ -231,7 +254,7 @@ export function createGuideController(
         block: 'center',
         inline: 'nearest',
       });
-      await waitForLayout();
+      await measure('layout', waitForLayout);
       if (!isCurrent(runGeneration)) {
         return { status: 'cancelled' };
       }
@@ -254,7 +277,7 @@ export function createGuideController(
       options.companion.setTarget(rect);
       setCompanionState('guiding');
       activeCleanup = startLayoutTracking(entry, runGeneration);
-      await waitForMovement();
+      await measure('movement', waitForMovement);
       if (!isCurrent(runGeneration)) {
         return { status: 'cancelled' };
       }

@@ -6,6 +6,19 @@ const DEFAULT_STT_MODE = 'transcribe';
 const DEFAULT_TTS_MODEL = 'bulbul:v3';
 const DEFAULT_TTS_SPEAKER = 'shubh';
 const DEFAULT_TTS_LANGUAGE = 'hi-IN';
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_RETRY_DELAY_MS = 250;
+const MAX_RETRY_DELAY_MS = 2_000;
+const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+class SarvamHttpError extends Error {
+  constructor(serviceName, response) {
+    super(`${serviceName} returned HTTP ${response.status}.`);
+    this.name = 'SarvamHttpError';
+    this.status = response.status;
+    this.retryAfter = response.headers?.get?.('retry-after') ?? undefined;
+  }
+}
 
 function endpointFor(baseUrl, pathname) {
   const url = new URL(baseUrl);
@@ -45,7 +58,88 @@ function extensionFor(contentType) {
   );
 }
 
-async function jsonResponse(response, serviceName, logger) {
+function positiveInteger(value, fallback) {
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
+function retryDelayMs(error, attempt, baseDelayMs) {
+  const retryAfter = error instanceof SarvamHttpError ? error.retryAfter : undefined;
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(seconds * 1_000, MAX_RETRY_DELAY_MS);
+    }
+
+    const dateDelay = Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(dateDelay) && dateDelay > 0) {
+      return Math.min(dateDelay, MAX_RETRY_DELAY_MS);
+    }
+  }
+
+  return Math.min(baseDelayMs * 2 ** (attempt - 1), MAX_RETRY_DELAY_MS);
+}
+
+function isRetryable(error) {
+  return (
+    !(error instanceof SarvamHttpError) ||
+    RETRYABLE_STATUS_CODES.has(error.status)
+  );
+}
+
+async function requestWithRetry(request, options) {
+  const maxAttempts = positiveInteger(options.maxAttempts, DEFAULT_MAX_ATTEMPTS);
+  const baseDelayMs = positiveInteger(
+    options.retryDelayMs,
+    DEFAULT_RETRY_DELAY_MS,
+  );
+  const sleep = options.sleep ?? ((delayMs) => new Promise((resolve) => {
+    setTimeout(resolve, delayMs);
+  }));
+
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await request();
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts || !isRetryable(error)) {
+        throw error;
+      }
+
+      const delayMs = retryDelayMs(error, attempt, baseDelayMs);
+      options.logger?.('[Sarvam retry]', {
+        service: options.serviceName,
+        attempt: attempt + 1,
+        delayMs,
+        ...(error instanceof SarvamHttpError ? { status: error.status } : {}),
+      });
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+function responseBodyForLog(payload, summarizeAudio) {
+  if (!summarizeAudio || !payload || typeof payload !== 'object') {
+    return payload;
+  }
+
+  const audios = Array.isArray(payload.audios)
+    ? payload.audios.map((audio) =>
+      typeof audio === 'string'
+        ? `<base64 audio: ${audio.length} characters>`
+        : '<invalid audio value>')
+    : payload.audios;
+  return { ...payload, ...(audios === undefined ? {} : { audios }) };
+}
+
+async function jsonResponse(
+  response,
+  serviceName,
+  logger,
+  summarizeAudio = false,
+) {
   let payload;
   try {
     payload = await response.json();
@@ -63,11 +157,11 @@ async function jsonResponse(response, serviceName, logger) {
     service: serviceName,
     status: response.status,
     ok: response.ok,
-    body: payload,
+    body: responseBodyForLog(payload, summarizeAudio),
   });
 
   if (!response.ok) {
-    throw new Error(`${serviceName} returned HTTP ${response.status}.`);
+    throw new SarvamHttpError(serviceName, response);
   }
 
   return payload;
@@ -79,6 +173,7 @@ export function createSarvamTranscriber(options = {}) {
   const shouldLogResponses =
     options.logResponses ?? process.env.SARVAM_LOG_RESPONSES === 'true';
   const logger = shouldLogResponses ? options.logger ?? console.log : undefined;
+  const retryLogger = options.logger ?? console.warn;
   const model = options.model ?? process.env.SARVAM_STT_MODEL ?? DEFAULT_STT_MODEL;
   const mode = options.mode ?? process.env.SARVAM_STT_MODE ?? DEFAULT_STT_MODE;
   const languageCode =
@@ -96,16 +191,18 @@ export function createSarvamTranscriber(options = {}) {
         form.append('language_code', languageCode);
       }
 
-      const response = await fetcher(endpointFor(baseUrl, '/speech-to-text'), {
-        method: 'POST',
-        headers: { 'api-subscription-key': apiKey },
-        body: form,
+      const payload = await requestWithRetry(async () => {
+        const response = await fetcher(endpointFor(baseUrl, '/speech-to-text'), {
+          method: 'POST',
+          headers: { 'api-subscription-key': apiKey },
+          body: form,
+        });
+        return jsonResponse(response, 'Sarvam speech-to-text', logger);
+      }, {
+        ...options,
+        logger: retryLogger,
+        serviceName: 'Sarvam speech-to-text',
       });
-      const payload = await jsonResponse(
-        response,
-        'Sarvam speech-to-text',
-        logger,
-      );
       return validateSpeechResult({
         transcript: payload?.transcript,
         ...(payload?.language_code ? { language: payload.language_code } : {}),
@@ -117,6 +214,9 @@ export function createSarvamTranscriber(options = {}) {
 export function createSarvamSynthesizer(options = {}) {
   const fetcher = options.fetcher ?? fetch;
   const baseUrl = baseUrlFrom(options);
+  const shouldLogResponses =
+    options.logResponses ?? process.env.SARVAM_LOG_RESPONSES === 'true';
+  const logger = shouldLogResponses ? options.logger ?? console.log : undefined;
   const model = options.model ?? process.env.SARVAM_TTS_MODEL ?? DEFAULT_TTS_MODEL;
   const speaker =
     options.speaker ?? process.env.SARVAM_TTS_SPEAKER ?? DEFAULT_TTS_SPEAKER;
@@ -128,20 +228,26 @@ export function createSarvamSynthesizer(options = {}) {
   return {
     async synthesize(input) {
       const apiKey = apiKeyFrom(options);
-      const response = await fetcher(endpointFor(baseUrl, '/text-to-speech'), {
-        method: 'POST',
-        headers: {
-          'api-subscription-key': apiKey,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          text: input.text,
-          language_code: input.language ?? defaultLanguage,
-          model,
-          speaker,
-        }),
+      const payload = await requestWithRetry(async () => {
+        const response = await fetcher(endpointFor(baseUrl, '/text-to-speech'), {
+          method: 'POST',
+          headers: {
+            'api-subscription-key': apiKey,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: input.text,
+            target_language_code: input.language ?? defaultLanguage,
+            model,
+            speaker,
+          }),
+        });
+        return jsonResponse(response, 'Sarvam text-to-speech', logger, true);
+      }, {
+        ...options,
+        logger: options.logger ?? console.warn,
+        serviceName: 'Sarvam text-to-speech',
       });
-      const payload = await jsonResponse(response, 'Sarvam text-to-speech');
       const audioParts = Array.isArray(payload?.audios)
         ? payload.audios.filter((audio) => typeof audio === 'string' && audio.length > 0)
         : [];
