@@ -14,6 +14,9 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 250;
 const DEFAULT_DEDUPE_WINDOW_MS = 2_000;
+const MAX_GUIDANCE_INSTRUCTION_LENGTH = 240;
+const MAX_EXPLANATION_LENGTH = 2_500;
+const MAX_CLARIFYING_QUESTION_LENGTH = 240;
 const MAX_RECENT_DEDUPE_RESPONSES = 64;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
@@ -34,7 +37,9 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   '- Choose targetId only from the semantic elements supplied by the user message.',
   '- The user must perform every click, input, select, consent, OTP, identity, and financial action.',
   '- Never return selectors, JavaScript, HTML, raw form values, credentials, or executable instructions.',
-  '- Keep spokenInstruction and consequence short and practical in the user\'s language style.',
+  `- Keep guide instructions, clarification questions, success messages, and consequence text concise: each must be at most ${MAX_GUIDANCE_INSTRUCTION_LENGTH} characters, including spaces.`,
+  `- An explain spokenInstruction may be up to ${MAX_EXPLANATION_LENGTH} characters when the question needs detail. Use that space only when useful, usually for 2 to 5 short spoken sentences; do not force a target or a guide action just to make an explanation shorter.`,
+  `- workflow.clarifyingQuestion must be at most ${MAX_CLARIFYING_QUESTION_LENGTH} characters and action clarify must repeat it exactly.`,
   '- Set expectedUserAction to exactly one lowercase value: click, input, or select; never a sentence.',
   '- For an input target, tell the user to say “I\'m done” when they finish entering information.',
   '- First determine the user\'s intent and make a complete prerequisite plan before choosing any guide target.',
@@ -70,6 +75,7 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   '3. If anything is missing or ambiguous, return clarify and do not return guide.',
   '4. If returning guide, find the exact targetId, read that element\'s safety.consequenceRequired value, and include a consequence when it is true.',
   '5. Include all workflow fields; do not rely on omitted optional fields.',
+  `6. Apply the action-specific speech limits: explain up to ${MAX_EXPLANATION_LENGTH} characters; guide, clarify, success, consequence, and clarifyingQuestion up to ${MAX_GUIDANCE_INSTRUCTION_LENGTH} characters.`,
   '',
   'Valid clarification shape:',
   '{"action":"clarify","targetId":null,"spokenInstruction":"Which option do you want?","consequence":null,"expectedUserAction":null,"language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["option"],"knownInformation":[],"missingInformation":["option"],"readiness":"needs_clarification","clarifyingQuestion":"Which option do you want?"}}',
@@ -637,6 +643,9 @@ function responseSafetySummary(value, elements) {
   const consequence = typeof value.consequence === 'string'
     ? value.consequence.trim()
     : undefined;
+  const spokenInstruction = typeof value.spokenInstruction === 'string'
+    ? value.spokenInstruction.trim()
+    : undefined;
 
   const workflow =
     value.workflow && typeof value.workflow === 'object'
@@ -652,6 +661,7 @@ function responseSafetySummary(value, elements) {
     consequenceRequired: Boolean(target && classifyConsequence(target.label)),
     consequencePresent: Boolean(consequence),
     consequenceLength: consequence?.length ?? 0,
+    spokenInstructionLength: spokenInstruction?.length ?? 0,
     expectedUserAction:
       typeof value.expectedUserAction === 'string'
         ? value.expectedUserAction
@@ -673,6 +683,10 @@ function responseSafetySummary(value, elements) {
     clarifyingQuestionPresent:
       typeof workflow?.clarifyingQuestion === 'string' &&
       workflow.clarifyingQuestion.trim().length > 0,
+    clarifyingQuestionLength:
+      typeof workflow?.clarifyingQuestion === 'string'
+        ? workflow.clarifyingQuestion.trim().length
+        : 0,
     ...(Array.isArray(workflow?.requiredInformation)
       ? {
           requiredInformation: workflow.requiredInformation

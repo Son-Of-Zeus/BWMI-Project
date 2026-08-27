@@ -36,7 +36,7 @@ reports missing or ambiguous information, the adapter safely returns
 `clarify`, even if the model selected a target. Consequence-aware validation
 still remains a server-side safety gate. Groq response/error logs include an
 operation ID, readiness state, bounded requirement counts/names, response keys,
-target safety classification, and consequence presence/length, but never the
+target safety classification, and consequence/spoken-text lengths, but never the
 prompt, user utterance, or spoken text. Groq prompt caching is automatic for
 GPT-OSS-120B when requests share an exact prefix; the stable system prompt is
 kept first, and response logs expose `promptTokens`, `cachedPromptTokens`, and
@@ -138,6 +138,13 @@ not user values. The extension retains this bounded status between voice turns
 so the model can continue a multi-turn clarification safely. `explain` may be
 target-specific or targetless: a supplied `targetId` is validated, while a
 general page/task explanation does not need to invent a UI target.
+
+Spoken text limits are action-specific: guide instructions, clarification
+questions, success messages, and consequences are capped at 240 characters,
+while an explanation may use up to 2,500 characters. The speech synthesis
+boundary accepts up to 2,500 characters for the default Sarvam Bulbul v3 REST
+adapter, so a valid general explanation is not rejected by the old
+240-character guidance limit.
 
 ## `/speech/transcribe`
 

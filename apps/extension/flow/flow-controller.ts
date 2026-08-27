@@ -29,6 +29,7 @@ import {
 } from '../runtime/latency';
 
 const REASONING_DEDUPE_WINDOW_MS = 2_000;
+const FINAL_SUBMISSION_LABEL_PATTERN = /\b(?:submit|finali[sz]e|send|file)\b/i;
 
 export type FlowPhase =
   | 'stopped'
@@ -124,6 +125,14 @@ function isInputQuestionUtterance(value: string): boolean {
     /\b(?:what|why|how|can|could|please explain|kya|kyun|kaise|kaun)\b/i.test(
       value,
     )
+  );
+}
+
+function isMatchedFinalSubmitClick(event: InteractionEvent): boolean {
+  return (
+    event.type === 'click' &&
+    event.matchedPending &&
+    FINAL_SUBMISSION_LABEL_PATTERN.test(event.label)
   );
 }
 
@@ -518,6 +527,10 @@ export function createFlowController(
 
     if (event.matchedPending) {
       options.guide.cancel();
+      if (isMatchedFinalSubmitClick(event)) {
+        setPhase('success');
+        return;
+      }
       scheduleContinuation();
       return;
     }

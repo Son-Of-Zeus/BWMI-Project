@@ -54,6 +54,10 @@ const NOT_APPLICABLE_WORKFLOW = {
   missingInformation: [],
   readiness: 'not_applicable',
 };
+const LONG_EXPLANATION =
+  'These options differ by eligibility, timing, required information, and outcome. Choose based on the task you actually want to complete. '
+    .repeat(8)
+    .trim();
 
 test('Groq adapter sends a direct JSON reasoning request', async () => {
   let captured;
@@ -111,6 +115,10 @@ test('Groq adapter sends a direct JSON reasoning request', async () => {
   assert.equal(responseLog[1][1].cachedPromptTokens, 80);
   assert.equal(responseLog[1][1].promptCacheHit, true);
   assert.equal(
+    responseLog[1][1].spokenInstructionLength,
+    'Online Services par click kariye.'.length,
+  );
+  assert.equal(
     captured.url,
     'https://api.groq.test/openai/v1/chat/completions',
   );
@@ -154,6 +162,8 @@ test('Groq adapter sends a direct JSON reasoning request', async () => {
   assert.match(payload.messages[0].content, /workflow\.readiness/);
   assert.match(payload.messages[0].content, /missingInformation/);
   assert.match(payload.messages[0].content, /browser default/);
+  assert.match(payload.messages[0].content, /explain spokenInstruction may be up to 2500 characters/);
+  assert.match(payload.messages[0].content, /at most 240 characters/);
   assert.equal(payload.messages[1].role, 'user');
   assert.match(payload.messages[1].content, /Online Services/);
   assert.match(payload.messages[1].content, /consequenceRequired/);
@@ -375,8 +385,7 @@ test('Groq adapter accepts a targetless explanation for a general question', asy
                 content: JSON.stringify({
                   action: 'explain',
                   targetId: null,
-                  spokenInstruction:
-                    'These options differ by eligibility and outcome.',
+                  spokenInstruction: LONG_EXPLANATION,
                   consequence: null,
                   expectedUserAction: null,
                   language: 'en-IN',
@@ -394,11 +403,48 @@ test('Groq adapter accepts a targetless explanation for a general question', asy
     const result = await reasoner.reason(createReasonRequest());
     assert.deepEqual(result, {
       action: 'explain',
-      spokenInstruction: 'These options differ by eligibility and outcome.',
+      spokenInstruction: LONG_EXPLANATION,
       language: 'en-IN',
       workflow: NOT_APPLICABLE_WORKFLOW,
     });
   });
+});
+
+test('Groq adapter keeps concise action guidance limits separate from explanations', async () => {
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    apiKey: 'test-groq-key',
+    logger: () => undefined,
+    fetcher: async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  action: 'guide',
+                  targetId: 'el_online',
+                  spokenInstruction: LONG_EXPLANATION,
+                  consequence: null,
+                  expectedUserAction: 'click',
+                  language: 'en-IN',
+                  workflow: READY_WORKFLOW,
+                }),
+              },
+            },
+          ],
+        };
+      },
+    }),
+  });
+
+  await assert.rejects(
+    () => reasoner.reason(createReasonRequest()),
+    /spokenInstruction exceeds its maximum length/,
+  );
 });
 
 test('Groq adapter retries transient transport failures', async () => {

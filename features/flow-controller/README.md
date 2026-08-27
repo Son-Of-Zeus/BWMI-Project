@@ -22,6 +22,9 @@ status events do not advance the workflow; a voice completion phrase is
 required. A new voice request cancels stale work while preserving pending context for an explanation;
 recoverable post-transcription failures
 retain a transient transcript for an explicit retry.
+When a user matches a pending click on a final-submit control, the controller
+treats it as a submission attempt, enters `success`, and does not re-run
+reasoning against a form that may have reset after submission.
 When reasoning returns `success`, automatic continuation becomes terminal so a
 later navigation event cannot restart the completed journey.
 

@@ -119,6 +119,12 @@ An `explain` action may omit `targetId` when answering a general page or task
 question. If it supplies a target, that target must still be present in the
 live registry and the guide controller will focus it before speaking.
 
+Spoken text is validated by action: guide instructions, clarification
+questions, success messages, and consequences stay concise at 240 characters,
+while `explain.spokenInstruction` can contain up to 2,500 characters for a
+useful multi-sentence answer. This prevents a concise action message from
+artificially limiting a general explanation.
+
 `requiredInformation`, `knownInformation`, and `missingInformation` contain
 requirement names only, never submitted values. `hasValue`, browser validity,
 prefilled values, and default selections do not prove that the user supplied or

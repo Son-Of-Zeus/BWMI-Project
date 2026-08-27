@@ -165,6 +165,22 @@ describe('prototype backend server', () => {
     });
   });
 
+  test('accepts a longer explanation for speech synthesis', async () => {
+    const text =
+      'These options differ by eligibility, timing, and outcome. '
+        .repeat(12)
+        .trim();
+
+    const response = await fetch(`${baseUrl}/speech/synthesize`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text, language: 'en-IN' }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(synthesizeCall, { text, language: 'en-IN' });
+  });
+
   test('handles preflight and unknown routes', async () => {
     const preflight = await fetch(`${baseUrl}/reason`, {
       method: 'OPTIONS',

@@ -101,7 +101,10 @@ export class ReasoningRequestError extends Error {
 }
 
 const EXECUTABLE_TEXT_PATTERN = /<\/?script\b|javascript:|```|=>|\b(?:function|const|let|var)\s+\w+/i;
-const MAX_SPOKEN_INSTRUCTION_LENGTH = 240;
+const MAX_GUIDANCE_INSTRUCTION_LENGTH = 240;
+const MAX_EXPLANATION_LENGTH = 2_500;
+const MAX_CONSEQUENCE_LENGTH = 240;
+const MAX_CLARIFYING_QUESTION_LENGTH = 240;
 const MAX_READINESS_ITEM_LENGTH = 120;
 const MAX_READINESS_ITEMS = 12;
 const READINESS_STATES = new Set<IntentReadiness['readiness']>([
@@ -155,11 +158,15 @@ function requireTarget(
   return targetId;
 }
 
-function requireSpokenInstruction(value: unknown): string {
+function requireSpokenInstruction(
+  value: unknown,
+  field = 'spokenInstruction',
+  maxLength = MAX_GUIDANCE_INSTRUCTION_LENGTH,
+): string {
   const instruction = requireString(
     value,
-    'spokenInstruction',
-    MAX_SPOKEN_INSTRUCTION_LENGTH,
+    field,
+    maxLength,
   );
   if (EXECUTABLE_TEXT_PATTERN.test(instruction)) {
     throw new ReasoningValidationError(
@@ -230,7 +237,11 @@ export function validateIntentReadiness(
   const clarifyingQuestion =
     value.clarifyingQuestion === null || value.clarifyingQuestion === undefined
       ? undefined
-      : requireSpokenInstruction(value.clarifyingQuestion);
+      : requireSpokenInstruction(
+          value.clarifyingQuestion,
+          `${field}.clarifyingQuestion`,
+          MAX_CLARIFYING_QUESTION_LENGTH,
+        );
 
   if (missingInformation.length > 0 && readiness !== 'needs_clarification') {
     throw new ReasoningValidationError(
@@ -375,7 +386,11 @@ export function validateGuideAction(
       const consequence =
         value.consequence === undefined
           ? undefined
-          : requireSpokenInstruction(value.consequence);
+          : requireSpokenInstruction(
+              value.consequence,
+              'consequence',
+              MAX_CONSEQUENCE_LENGTH,
+            );
       return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
@@ -402,7 +417,11 @@ export function validateGuideAction(
       return enforceTargetSafety({
         action,
         ...(targetId ? { targetId } : {}),
-        spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
+        spokenInstruction: requireSpokenInstruction(
+          value.spokenInstruction,
+          'spokenInstruction',
+          MAX_EXPLANATION_LENGTH,
+        ),
         language: requireLanguage(value.language),
         ...(workflow ? { workflow } : {}),
       }, targetMetadata);

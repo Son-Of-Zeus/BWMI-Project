@@ -66,6 +66,11 @@ cd apps/extension
 npm test -- --run voice/voice.test.ts
 ```
 
+The speech boundary accepts up to 2,500 characters per synthesis request,
+which matches the default Bulbul v3 REST limit. General explanations may
+therefore be spoken as multiple short sentences without inheriting the shorter
+limit used for individual manual guidance messages.
+
 ## Provider
 
 Sarvam AI is the intended provider for:

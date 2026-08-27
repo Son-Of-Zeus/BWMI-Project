@@ -264,6 +264,43 @@ describe('reasoning boundary', () => {
     ).toThrow(/executable content/);
   });
 
+  it('allows detailed explanations while keeping action guidance concise', () => {
+    const explanation =
+      'These options differ by eligibility, timing, and outcome. '
+        .repeat(12)
+        .trim();
+    expect(explanation.length).toBeGreaterThan(240);
+
+    expect(
+      validateGuideAction(
+        {
+          action: 'explain',
+          targetId: null,
+          spokenInstruction: explanation,
+          language: 'en-IN',
+        },
+        [],
+      ),
+    ).toEqual({
+      action: 'explain',
+      spokenInstruction: explanation,
+      language: 'en-IN',
+    });
+
+    expect(() =>
+      validateGuideAction(
+        {
+          action: 'guide',
+          targetId: 'el_1',
+          spokenInstruction: explanation,
+          expectedUserAction: 'click',
+          language: 'en-IN',
+        },
+        ['el_1'],
+      ),
+    ).toThrow(/spokenInstruction exceeds its maximum length/);
+  });
+
   it('parses structured JSON and rejects malformed responses', () => {
     expect(
       parseGuideActionJson(

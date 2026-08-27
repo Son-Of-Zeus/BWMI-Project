@@ -105,9 +105,12 @@ function createGuide(
   };
 }
 
-function createHarness(actions: GuideAction[]) {
+function createHarness(
+  actions: GuideAction[],
+  buttonLabel = 'Online Services',
+) {
   const button = document.createElement('button');
-  button.textContent = 'Online Services';
+  button.textContent = buttonLabel;
   document.body.append(button);
 
   const scannerHarness = createScanner();
@@ -379,6 +382,46 @@ describe('PF flow controller', () => {
     await new Promise((resolve) => setTimeout(resolve, 5));
 
     expect(harness.reasoner.reason).toHaveBeenCalledTimes(2);
+    expect(harness.flow.getSnapshot().phase).toBe('success');
+  });
+
+  it('enters success after a matched final-submit click without re-reasoning', async () => {
+    const submitAction: GuideAction = {
+      ...guideAction,
+      spokenInstruction: 'Submit Request par click kariye.',
+      consequence: 'Isse aapki request submit ho jayegi.',
+    };
+    const harness = createHarness([submitAction], 'Submit Request');
+    harness.flow.start();
+    await harness.flow.requestVoice();
+
+    harness.interactions.emit({
+      type: 'click',
+      action: 'click',
+      targetId: 'el_1',
+      label: 'Submit Request',
+      matchedPending: true,
+      timestamp: 1,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+    expect(harness.flow.getSnapshot()).toMatchObject({
+      phase: 'success',
+      lastAction: submitAction,
+    });
+    expect(harness.session.getState().companionState).toBe('success');
+
+    harness.interactions.emit({
+      type: 'navigation',
+      url: 'http://localhost:5173/withdrawal',
+      previousUrl: 'http://localhost:5173/withdrawal',
+      reason: 'url-poll',
+      timestamp: 2,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
     expect(harness.flow.getSnapshot().phase).toBe('success');
   });
 

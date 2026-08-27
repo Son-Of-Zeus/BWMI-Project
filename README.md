@@ -359,6 +359,11 @@ missing or ambiguous, it returns `clarify`; `guide` is permitted only when the
 readiness assessment is `ready`. The requirement arrays contain names only,
 never user values.
 
+Spoken text limits are action-specific: concise guide, clarification, success,
+and consequence text is limited to 240 characters, while a general
+`explain.spokenInstruction` may use up to 2,500 characters. These limits keep
+manual actions brief without rejecting a useful general explanation.
+
 ---
 
 ## MVP PF Withdrawal Demo

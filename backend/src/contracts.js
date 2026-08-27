@@ -18,7 +18,12 @@ const READINESS_STATES = new Set([
   'not_applicable',
 ]);
 const MAX_TEXT_LENGTH = 2_000;
-const MAX_INSTRUCTION_LENGTH = 240;
+const MAX_GUIDANCE_INSTRUCTION_LENGTH = 240;
+const MAX_EXPLANATION_LENGTH = 2_500;
+const MAX_CONSEQUENCE_LENGTH = 240;
+const MAX_CLARIFYING_QUESTION_LENGTH = 240;
+// Sarvam Bulbul v3's REST API accepts up to 2,500 characters per request.
+const MAX_SPEECH_TEXT_LENGTH = 2_500;
 const MAX_READINESS_ITEM_LENGTH = 120;
 const MAX_READINESS_ITEMS = 12;
 
@@ -190,6 +195,7 @@ export function validateIntentReadiness(value, field = 'workflow') {
       : requireInstruction(
           workflow.clarifyingQuestion,
           `${field}.clarifyingQuestion`,
+          MAX_CLARIFYING_QUESTION_LENGTH,
         );
 
   if (missingInformation.length > 0 && readiness !== 'needs_clarification') {
@@ -324,8 +330,12 @@ export function classifyConsequence(label) {
   return CONSEQUENCE_RULES.find(([, pattern]) => pattern.test(label))?.[0];
 }
 
-function requireInstruction(value, field) {
-  const instruction = requireString(value, field, MAX_INSTRUCTION_LENGTH);
+function requireInstruction(
+  value,
+  field,
+  maxLength = MAX_GUIDANCE_INSTRUCTION_LENGTH,
+) {
+  const instruction = requireString(value, field, maxLength);
   if (/<\/?script\b|javascript:|```|=>|\b(?:function|const|let|var)\s+\w+/i.test(instruction)) {
     throw new ContractValidationError(`${field} contains executable content`);
   }
@@ -400,7 +410,11 @@ export function validateGuideAction(value, elements) {
     const consequence =
       action.consequence === undefined
         ? undefined
-        : requireInstruction(action.consequence, 'consequence');
+        : requireInstruction(
+            action.consequence,
+            'consequence',
+            MAX_CONSEQUENCE_LENGTH,
+          );
     if (classifyConsequence(target.label) && !consequence) {
       throw new ContractValidationError(
         'Consequential guide actions require a consequence explanation',
@@ -433,7 +447,11 @@ export function validateGuideAction(value, elements) {
     return {
       action: 'explain',
       ...(targetId ? { targetId } : {}),
-      spokenInstruction: requireInstruction(action.spokenInstruction, 'spokenInstruction'),
+      spokenInstruction: requireInstruction(
+        action.spokenInstruction,
+        'spokenInstruction',
+        MAX_EXPLANATION_LENGTH,
+      ),
       language: requireString(action.language, 'language', 24),
       ...(workflow ? { workflow } : {}),
     };
@@ -471,7 +489,13 @@ export function validateGuideAction(value, elements) {
     }
     return {
       action: actionType,
-      spokenInstruction: requireInstruction(action.spokenInstruction, 'spokenInstruction'),
+      spokenInstruction: requireInstruction(
+        action.spokenInstruction,
+        'spokenInstruction',
+        actionType === 'clarify'
+          ? MAX_CLARIFYING_QUESTION_LENGTH
+          : MAX_GUIDANCE_INSTRUCTION_LENGTH,
+      ),
       language: requireString(action.language, 'language', 24),
       ...(workflow ? { workflow } : {}),
     };
@@ -495,7 +519,7 @@ export function validateSynthesisInput(value) {
   const input = requireRecord(value, 'speech synthesis input');
   requireAllowedKeys(input, ['text', 'language'], 'speech synthesis input');
   return {
-    text: requireString(input.text, 'text', MAX_INSTRUCTION_LENGTH),
+    text: requireString(input.text, 'text', MAX_SPEECH_TEXT_LENGTH),
     ...(input.language !== undefined
       ? { language: requireString(input.language, 'language', 24) }
       : {}),
