@@ -1,5 +1,41 @@
 # React + Vite
 
+## Hosted voice companion demo
+
+The portal pages and routes remain unchanged. The root app mounts the existing
+voice companion in an isolated Shadow DOM so the jury can open the hosted site
+without installing a Chrome extension.
+
+### Local development
+
+Run the site from this directory:
+
+```sh
+npm install
+npm run dev
+```
+
+When `VITE_VOICE_COMPANION_BACKEND_URL` is not set, the embedded companion uses
+the local backend at `http://127.0.0.1:8787`. Copy `.env.example` and set the
+variable for a hosted deployment.
+
+### Vercel deployment
+
+Create a Vercel project with this directory as its root:
+
+```text
+/Users/vpranav/Desktop/Dev/BuildWhatMovesIndia/pf-voice-companion-readmes/test site
+```
+
+Use `npm run build` as the build command and `dist` as the output directory.
+The included `vercel.json` preserves the React Router SPA fallback for direct
+loads of `/dashboard` and other portal routes.
+Set `VITE_VOICE_COMPANION_BACKEND_URL` to the backend project's public `/api`
+URL, for example `https://voice-companion-api.vercel.app/api`. This variable is
+public by design; provider credentials belong only to the backend project.
+
+The deployed site must use HTTPS so the browser can grant microphone access.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

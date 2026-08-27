@@ -7,10 +7,12 @@ import Login from './pages/Login'
 import Nominee from './pages/Nominee'
 import Passbook from './pages/Passbook'
 import Withdrawal from './pages/Withdrawal'
+import EmbeddedCompanion from './voice-companion/EmbeddedCompanion'
 
 export default function App() {
   return (
     <AuthProvider>
+      <EmbeddedCompanion />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />

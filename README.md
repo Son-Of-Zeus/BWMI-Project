@@ -14,7 +14,7 @@ The extension must guide the user without taking control of consequential action
 
 ## Project Status
 
-The mock portal is complete and should be treated as a read-only integration target at `http://localhost:5173`. The core extension mechanics and a local Groq/Sarvam-backed backend boundary are implemented; deployment is deferred. Ongoing development must stay within the Chrome extension, backend, and supporting feature modules. Do not add portal functionality or extension-specific hooks to the site.
+The mock portal is complete and should be treated as a read-only integration target at `http://localhost:5173`. The core extension mechanics, embedded host mount, and local Groq/Sarvam-backed backend boundary are implemented. The hosted demo uses a generic root-level mount in `test site/`; portal pages and routes remain unchanged, and no page-specific assistant hooks or instrumentation are allowed.
 
 ---
 
@@ -26,7 +26,7 @@ The MVP should prove three things together:
 2. An LLM can choose the correct semantic UI target from a compact page representation.
 3. A visual companion can guide the user to that target in a calm, understandable way while leaving the final action to the user.
 
-The mock EPFO-style website is a test environment only. It must behave like an ordinary external website and must not contain assistant-specific IDs, `GuideTarget` wrappers, or extension hooks.
+The mock EPFO-style website is a test environment only. Its page components must behave like ordinary external website components and must not contain assistant-specific IDs, `GuideTarget` wrappers, or page-specific extension hooks. The hosted demo may mount the generic companion host at the application root.
 
 ---
 
@@ -37,10 +37,13 @@ project/
 ├── README.md
 │
 ├── apps/
-│   ├── mock-portal/
-│   │   └── README.md
 │   └── extension/
 │       └── README.md
+│
+├── test site/
+│   ├── README.md
+│   └── src/
+│       └── voice-companion/
 │
 ├── backend/
 │   ├── README.md
@@ -569,7 +572,7 @@ The MVP is successful when:
 1. Desktop Chrome is the only required browser for the hackathon.
 2. The mock portal is a visual clone of a live government website.
 3. The mock portal is deployed as a normal public website and contains no assistant-specific metadata or hooks.
-4. The MVP is a Chrome extension from day one; a non-extension demo is not considered sufficient.
+4. The MVP supports the installable Chrome extension and an embedded host using the same extension core; the embedded host is the hosted hackathon demo path.
 5. Manifest V3 is the extension target.
 6. WXT is the proposed extension build framework; it can be replaced without changing the core architecture.
 7. React and TypeScript are used inside the extension.
@@ -586,4 +589,4 @@ The MVP is successful when:
 18. Sensitive form values are not sent to the reasoning model by default.
 19. No database is required for the first hackathon demo.
 20. The first supported journey is PF withdrawal guidance, including one terminology explanation such as UAN.
-21. The local mock portal runs on port 5173; public deployment is deferred.
+21. The local mock portal runs on port 5173; the hosted frontend and separate backend are deployed as Vercel projects.

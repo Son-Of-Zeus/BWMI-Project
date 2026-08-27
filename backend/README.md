@@ -186,9 +186,33 @@ Return playable audio.
 
 ## Deployment
 
-The current prototype is local-only: the mock portal is expected at
-`http://localhost:5173` and the backend at `http://127.0.0.1:8787`. Deployment
-is intentionally deferred. A later deployment must be compatible with:
+The backend can be deployed as a separate Vercel project with this directory
+as its project root:
+
+```text
+/Users/vpranav/Desktop/Dev/BuildWhatMovesIndia/pf-voice-companion-readmes/backend
+```
+
+The Vercel entrypoints expose the same provider-neutral contracts at:
+
+```text
+POST /api/reason
+POST /api/speech/transcribe
+POST /api/speech/synthesize
+```
+
+Configure `GROQ_API_KEY`, `GROQ_MODEL`, `SARVAM_API_KEY`, the optional provider
+settings, and `ALLOWED_ORIGINS` in the Vercel project. `ALLOWED_ORIGINS` should
+contain the exact HTTPS origin of the deployed frontend. Keep
+`PROTOTYPE_MODE=false` for the live demo. The local `node src/server.js`
+listener remains available for development and contract tests.
+
+The Vercel transport applies a 4 MiB audio request cap to stay below Vercel's
+4.5 MB function payload limit. The embedded frontend also stops a recording
+after 30 seconds. Speech and reasoning functions are configured for a maximum
+duration of 60 seconds.
+
+A hosted deployment must be compatible with:
 
 - HTTPS
 - low latency

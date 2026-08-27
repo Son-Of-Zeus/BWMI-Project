@@ -147,6 +147,8 @@ function errorPayload(error) {
   };
 }
 
+export const MAX_VERCEL_AUDIO_BYTES = 4 * 1024 * 1024;
+
 function upstreamError(message) {
   return new HttpError(502, message);
 }
@@ -211,7 +213,11 @@ async function runSynthesizer(synthesizer, input) {
   }
 }
 
-async function handleRequest(request, response, options) {
+function endpointPath(requestUrl) {
+  return requestUrl.pathname.replace(/^\/api(?=\/|$)/, '') || '/';
+}
+
+export async function handleRequest(request, response, options) {
   setCorsHeaders(request, response, options.allowedOrigins);
 
   const requestUrl = new URL(
@@ -225,7 +231,7 @@ async function handleRequest(request, response, options) {
     return;
   }
 
-  const endpoint = requestUrl.pathname;
+  const endpoint = endpointPath(requestUrl);
   if (!['/reason', '/speech/transcribe', '/speech/synthesize'].includes(endpoint)) {
     throw new HttpError(404, 'Route not found.');
   }
@@ -243,7 +249,10 @@ async function handleRequest(request, response, options) {
   }
 
   if (endpoint === '/speech/transcribe') {
-    const audio = await readBody(request, MAX_AUDIO_BYTES);
+    const audio = await readBody(
+      request,
+      options.maxAudioBytes ?? MAX_AUDIO_BYTES,
+    );
     if (audio.length === 0) {
       throw new HttpError(400, 'Audio request body cannot be empty.');
     }
@@ -262,18 +271,11 @@ async function handleRequest(request, response, options) {
   writeAudio(response, result.audio, result.mimeType);
 }
 
-function addressFor(server) {
-  const address = server.address();
-  if (!address || typeof address === 'string') {
-    throw new Error('Backend server did not expose a network address.');
-  }
-  return address;
-}
-
-export function createBackendServer(options = {}) {
+export function createBackendAdapters(options = {}) {
   const usePrototypeAdapters =
     options.usePrototypeAdapters ?? process.env.PROTOTYPE_MODE === 'true';
-  const adapters = {
+
+  return {
     reasoner:
       options.reasoner ??
       (usePrototypeAdapters
@@ -291,9 +293,19 @@ export function createBackendServer(options = {}) {
         : createSarvamSynthesizer(options.sarvam)),
     allowedOrigins: normalizeAllowedOrigins(options.allowedOrigins),
   };
+}
 
-  const server = http.createServer((request, response) => {
-    handleRequest(request, response, adapters).catch((error) => {
+export function createBackendRequestHandler(options = {}) {
+  const adapters = options.adapters ?? createBackendAdapters(options);
+  const requestOptions = {
+    ...adapters,
+    ...(options.maxAudioBytes !== undefined
+      ? { maxAudioBytes: options.maxAudioBytes }
+      : {}),
+  };
+
+  return (request, response) =>
+    handleRequest(request, response, requestOptions).catch((error) => {
       if (response.headersSent) {
         response.destroy();
         return;
@@ -301,10 +313,23 @@ export function createBackendServer(options = {}) {
       const { status, body } = errorPayload(error);
       writeJson(response, status, body);
     });
-  });
+}
+
+function addressFor(server) {
+  const address = server.address();
+  if (!address || typeof address === 'string') {
+    throw new Error('Backend server did not expose a network address.');
+  }
+  return address;
+}
+
+export function createBackendServer(options = {}) {
+  const handler = createBackendRequestHandler(options);
+  const server = http.createServer(handler);
 
   return {
     server,
+    handler,
 
     listen(port = DEFAULT_PORT, hostname = DEFAULT_HOSTNAME) {
       return new Promise((resolve, reject) => {

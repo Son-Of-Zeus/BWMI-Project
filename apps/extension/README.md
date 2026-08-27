@@ -32,6 +32,12 @@ orchestration, runtime composition, accessibility, demo reset, loading
 latency, and error recovery are covered by their respective feature
 boundaries.
 
+The same core runtime can also be mounted by a host application through
+`runtime/embedded-mount.tsx`. The hosted test site uses this path to create a
+fixed, pointer-safe Shadow DOM host while continuing to scan the live page
+document. The WXT content-script entrypoint remains unchanged and continues to
+provide the installable extension path.
+
 ## Responsibilities
 
 The extension owns:
