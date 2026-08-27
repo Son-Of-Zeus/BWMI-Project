@@ -340,9 +340,22 @@ export type GuideAction =
       spokenInstruction: string;
       language: string;
     };
+
+export type IntentReadiness = {
+  intent?: string;
+  requiredInformation: string[];
+  knownInformation: string[];
+  missingInformation: string[];
+  readiness: "ready" | "needs_clarification" | "not_applicable";
+  clarifyingQuestion?: string;
+};
 ```
 
-Keep this schema small during the hackathon.
+Keep this schema small during the hackathon. The reasoning layer must assess
+required information before selecting a guide target. If information is
+missing or ambiguous, it returns `clarify`; `guide` is permitted only when the
+readiness assessment is `ready`. The requirement arrays contain names only,
+never user values.
 
 ---
 
@@ -367,7 +380,13 @@ User presses the microphone and says:
 
 The transcript and semantic snapshot are sent to the reasoning API.
 
-The LLM selects the visible `Online Services` element.
+Before selecting a target, the reasoning layer identifies the information and
+decisions needed for the user's intent. If the user has not supplied or
+confirmed them, the assistant asks a focused clarification question first;
+browser defaults and prefilled values are not treated as confirmation.
+
+Once the intent is ready, the LLM selects the visible `Online Services` element
+or another appropriate target.
 
 The extension:
 
@@ -449,7 +468,7 @@ Do not mix companion animation state with workflow/session state.
 ### Backend
 
 - Minimal server-side API
-- Groq Chat Completions API with JSON response mode
+- Groq Chat Completions API with strict structured output for `gpt-oss-120b`
 - Sarvam AI for STT/TTS
 - no database required for the first demo
 

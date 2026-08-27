@@ -29,10 +29,24 @@ export type PendingAction = {
   expectedUserAction: ExpectedUserAction;
 };
 
+/**
+ * Bounded planning metadata. It contains requirement names/status only; never
+ * store the user's actual values here.
+ */
+export type IntentReadiness = {
+  intent?: string;
+  requiredInformation: string[];
+  knownInformation: string[];
+  missingInformation: string[];
+  readiness: 'ready' | 'needs_clarification' | 'not_applicable';
+  clarifyingQuestion?: string;
+};
+
 export type SessionState = {
   goal?: string;
   recentActions: RecentAction[];
   pendingAction?: PendingAction;
+  workflow?: IntentReadiness;
   companionState: CompanionState;
 };
 
@@ -54,6 +68,7 @@ export interface SessionStateStore {
   recordAction(action: RecordActionInput): void;
   setPendingAction(pendingAction?: PendingAction): void;
   clearPendingAction(): void;
+  setWorkflow(workflow?: IntentReadiness): void;
   setCompanionState(companionState: CompanionState): void;
   reset(): void;
 }
@@ -63,11 +78,27 @@ function normalizeText(value: string | undefined): string | undefined {
   return normalized || undefined;
 }
 
+function normalizeWorkflowText(value: string | undefined): string | undefined {
+  const normalized = normalizeText(value);
+  return normalized?.replace(
+    /(?:₹|rs\.?|inr|\$|€|£)\s*[\d,]+(?:\.\d+)?|\b\d{5,18}\b/gi,
+    '[redacted]',
+  );
+}
+
 function cloneState(state: SessionState): SessionState {
   return {
     goal: state.goal,
     recentActions: state.recentActions.map((action) => ({ ...action })),
     pendingAction: state.pendingAction ? { ...state.pendingAction } : undefined,
+    workflow: state.workflow
+      ? {
+          ...state.workflow,
+          requiredInformation: [...state.workflow.requiredInformation],
+          knownInformation: [...state.workflow.knownInformation],
+          missingInformation: [...state.workflow.missingInformation],
+        }
+      : undefined,
     companionState: state.companionState,
   };
 }
@@ -156,6 +187,39 @@ export function createSessionState(
       }
 
       publish({ ...state, pendingAction: undefined });
+    },
+
+    setWorkflow(workflow) {
+      if (!workflow) {
+        if (!state.workflow) {
+          return;
+        }
+        publish({ ...state, workflow: undefined });
+        return;
+      }
+
+      const intent = normalizeWorkflowText(workflow.intent);
+      const clarifyingQuestion = normalizeWorkflowText(
+        workflow.clarifyingQuestion,
+      );
+
+      publish({
+        ...state,
+        workflow: {
+          ...(intent ? { intent } : {}),
+          requiredInformation: workflow.requiredInformation
+            .map(normalizeWorkflowText)
+            .filter((item): item is string => Boolean(item)),
+          knownInformation: workflow.knownInformation
+            .map(normalizeWorkflowText)
+            .filter((item): item is string => Boolean(item)),
+          missingInformation: workflow.missingInformation
+            .map(normalizeWorkflowText)
+            .filter((item): item is string => Boolean(item)),
+          readiness: workflow.readiness,
+          ...(clarifyingQuestion ? { clarifyingQuestion } : {}),
+        },
+      });
     },
 
     setCompanionState(companionState) {

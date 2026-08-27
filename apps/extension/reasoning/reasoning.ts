@@ -1,6 +1,7 @@
 import type { SemanticPageSnapshot, ValidationState } from '../dom/semantic';
 import type {
   ExpectedUserAction,
+  IntentReadiness,
   SessionState,
 } from '../session/session-state';
 import type { SemanticElement } from '../registry/element-registry';
@@ -23,6 +24,7 @@ export type ReasonRequest = {
       type: ExpectedUserAction;
       targetLabel?: string;
     };
+    workflow?: IntentReadiness;
   };
   page: {
     title?: string;
@@ -31,38 +33,42 @@ export type ReasonRequest = {
   };
 };
 
+type WorkflowAware = {
+  workflow?: IntentReadiness;
+};
+
 export type GuideAction =
-  | {
+  | ({
       action: 'guide';
       targetId: string;
       spokenInstruction: string;
       consequence?: string;
       expectedUserAction: ExpectedUserAction;
       language: string;
-    }
-  | {
+    } & WorkflowAware)
+  | ({
       action: 'explain';
       targetId: string;
       spokenInstruction: string;
       language: string;
-    }
-  | {
+    } & WorkflowAware)
+  | ({
       action: 'scroll';
       targetId: string;
-    }
-  | {
+    } & WorkflowAware)
+  | ({
       action: 'wait';
-    }
-  | {
+    } & WorkflowAware)
+  | ({
       action: 'clarify';
       spokenInstruction: string;
       language: string;
-    }
-  | {
+    } & WorkflowAware)
+  | ({
       action: 'success';
       spokenInstruction: string;
       language: string;
-    };
+    } & WorkflowAware);
 
 export type Reasoner = {
   reason(request: ReasonRequest): Promise<GuideAction>;
@@ -96,6 +102,13 @@ export class ReasoningRequestError extends Error {
 
 const EXECUTABLE_TEXT_PATTERN = /<\/?script\b|javascript:|```|=>|\b(?:function|const|let|var)\s+\w+/i;
 const MAX_SPOKEN_INSTRUCTION_LENGTH = 240;
+const MAX_READINESS_ITEM_LENGTH = 120;
+const MAX_READINESS_ITEMS = 12;
+const READINESS_STATES = new Set<IntentReadiness['readiness']>([
+  'ready',
+  'needs_clarification',
+  'not_applicable',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -160,10 +173,146 @@ function requireLanguage(value: unknown): string {
   return requireString(value, 'language', 24);
 }
 
+function validateReadinessItems(value: unknown, field: string): string[] {
+  if (!Array.isArray(value)) {
+    throw new ReasoningValidationError(`${field} must be an array`);
+  }
+  if (value.length > MAX_READINESS_ITEMS) {
+    throw new ReasoningValidationError(`${field} exceeds the maximum count`);
+  }
+
+  return value.map((item, index) =>
+    requireString(item, `${field}[${index}]`, MAX_READINESS_ITEM_LENGTH),
+  );
+}
+
+export function validateIntentReadiness(
+  value: unknown,
+  field = 'workflow',
+): IntentReadiness {
+  if (!isRecord(value)) {
+    throw new ReasoningValidationError(`${field} must be an object`);
+  }
+  requireAllowedKeys(value, [
+    'intent',
+    'requiredInformation',
+    'knownInformation',
+    'missingInformation',
+    'readiness',
+    'clarifyingQuestion',
+  ]);
+
+  const intent =
+    value.intent === null || value.intent === undefined
+      ? undefined
+      : requireString(value.intent, `${field}.intent`, 160);
+  const requiredInformation = validateReadinessItems(
+    value.requiredInformation,
+    `${field}.requiredInformation`,
+  );
+  const knownInformation = validateReadinessItems(
+    value.knownInformation,
+    `${field}.knownInformation`,
+  );
+  const missingInformation = validateReadinessItems(
+    value.missingInformation,
+    `${field}.missingInformation`,
+  );
+  const readinessValue = requireString(
+    value.readiness,
+    `${field}.readiness`,
+    32,
+  );
+  if (!READINESS_STATES.has(readinessValue as IntentReadiness['readiness'])) {
+    throw new ReasoningValidationError(`${field}.readiness is not supported`);
+  }
+  const readiness = readinessValue as IntentReadiness['readiness'];
+  const clarifyingQuestion =
+    value.clarifyingQuestion === null || value.clarifyingQuestion === undefined
+      ? undefined
+      : requireSpokenInstruction(value.clarifyingQuestion);
+
+  if (missingInformation.length > 0 && readiness !== 'needs_clarification') {
+    throw new ReasoningValidationError(
+      `${field}.readiness must be needs_clarification when information is missing`,
+    );
+  }
+  if (readiness === 'needs_clarification') {
+    if (missingInformation.length === 0) {
+      throw new ReasoningValidationError(
+        `${field}.missingInformation is required for clarification`,
+      );
+    }
+    if (!clarifyingQuestion) {
+      throw new ReasoningValidationError(
+        `${field}.clarifyingQuestion is required for clarification`,
+      );
+    }
+  }
+  if (readiness !== 'needs_clarification' && clarifyingQuestion) {
+    throw new ReasoningValidationError(
+      `${field}.clarifyingQuestion is only allowed when clarification is needed`,
+    );
+  }
+
+  return {
+    ...(intent ? { intent } : {}),
+    requiredInformation,
+    knownInformation,
+    missingInformation,
+    readiness,
+    ...(clarifyingQuestion ? { clarifyingQuestion } : {}),
+  };
+}
+
+function redactWorkflowText(value: string): string {
+  return redactSensitiveText(value).replace(
+    /(?:₹|rs\.?|inr|\$|€|£)\s*[\d,]+(?:\.\d+)?|\b\d{5,18}\b/gi,
+    '[redacted]',
+  );
+}
+
+function safeIntentReadiness(workflow: IntentReadiness): IntentReadiness {
+  const safeWorkflow = validateIntentReadiness(workflow);
+  return {
+    ...(safeWorkflow.intent
+      ? { intent: redactWorkflowText(safeWorkflow.intent) }
+      : {}),
+    requiredInformation: safeWorkflow.requiredInformation.map(redactWorkflowText),
+    knownInformation: safeWorkflow.knownInformation.map(redactWorkflowText),
+    missingInformation: safeWorkflow.missingInformation.map(redactWorkflowText),
+    readiness: safeWorkflow.readiness,
+    ...(safeWorkflow.clarifyingQuestion
+      ? { clarifyingQuestion: redactWorkflowText(safeWorkflow.clarifyingQuestion) }
+      : {}),
+  };
+}
+
 function enforceTargetSafety(
   action: GuideAction,
   targetMetadata?: Iterable<SafetyTarget>,
 ): GuideAction {
+  if (
+    action.action === 'guide' &&
+    action.workflow &&
+    (action.workflow.readiness !== 'ready' ||
+      action.workflow.missingInformation.length > 0)
+  ) {
+    throw new ReasoningValidationError(
+      'GuideAction cannot guide while intent information is missing',
+    );
+  }
+
+  if (
+    action.action === 'clarify' &&
+    action.workflow &&
+    action.workflow.readiness !== 'needs_clarification'
+  ) {
+    throw new ReasoningValidationError(
+      'Clarify action requires a needs_clarification intent assessment',
+    );
+  }
+
   if (!targetMetadata) {
     return action;
   }
@@ -197,6 +346,11 @@ export function validateGuideAction(
     throw new ReasoningValidationError('GuideAction.action is required');
   }
 
+  const workflow =
+    value.workflow === undefined
+      ? undefined
+      : validateIntentReadiness(value.workflow, 'workflow');
+
   switch (action) {
     case 'guide': {
       requireAllowedKeys(value, [
@@ -206,6 +360,7 @@ export function validateGuideAction(
         'consequence',
         'expectedUserAction',
         'language',
+        'workflow',
       ]);
       const expectedUserAction = value.expectedUserAction;
       if (
@@ -228,6 +383,7 @@ export function validateGuideAction(
         ...(consequence ? { consequence } : {}),
         expectedUserAction,
         language: requireLanguage(value.language),
+        ...(workflow ? { workflow } : {}),
       }, targetMetadata);
     }
 
@@ -237,32 +393,50 @@ export function validateGuideAction(
         'targetId',
         'spokenInstruction',
         'language',
+        'workflow',
       ]);
       return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
         spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
         language: requireLanguage(value.language),
+        ...(workflow ? { workflow } : {}),
       }, targetMetadata);
 
     case 'scroll':
-      requireAllowedKeys(value, ['action', 'targetId']);
+      requireAllowedKeys(value, ['action', 'targetId', 'workflow']);
       return enforceTargetSafety({
         action,
         targetId: requireTarget(value.targetId, availableTargets),
+        ...(workflow ? { workflow } : {}),
       }, targetMetadata);
 
     case 'wait':
-      requireAllowedKeys(value, ['action']);
-      return { action };
+      requireAllowedKeys(value, ['action', 'workflow']);
+      return { action, ...(workflow ? { workflow } : {}) };
 
     case 'clarify':
     case 'success':
-      requireAllowedKeys(value, ['action', 'spokenInstruction', 'language']);
+      requireAllowedKeys(value, [
+        'action',
+        'spokenInstruction',
+        'language',
+        'workflow',
+      ]);
+      if (
+        workflow &&
+        action === 'clarify' &&
+        workflow.readiness !== 'needs_clarification'
+      ) {
+        throw new ReasoningValidationError(
+          'Clarify action requires a needs_clarification intent assessment',
+        );
+      }
       return {
         action,
         spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
         language: requireLanguage(value.language),
+        ...(workflow ? { workflow } : {}),
       };
 
     default:
@@ -353,6 +527,9 @@ export function sanitizeReasonRequest(request: ReasonRequest): ReasonRequest {
             },
           }
         : {}),
+      ...(request.session.workflow
+        ? { workflow: safeIntentReadiness(request.session.workflow) }
+        : {}),
     },
     page: {
       elements: request.page.elements.map(safeSemanticElement),
@@ -404,6 +581,7 @@ export function buildReasonRequest(input: {
             targetLabel: pendingTarget?.label,
           }
         : undefined,
+      workflow: input.session.workflow,
     },
     page: {
       title: input.page.page.title,

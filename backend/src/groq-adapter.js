@@ -1,26 +1,34 @@
+import { createHash } from 'node:crypto';
 import http from 'node:http';
 import https from 'node:https';
 
-import { validateGuideAction } from './contracts.js';
+import {
+  classifyConsequence,
+  validateIntentReadiness,
+  validateGuideAction,
+} from './contracts.js';
 
 const DEFAULT_GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 250;
-const MAX_RETRY_DELAY_MS = 2_000;
+const DEFAULT_DEDUPE_WINDOW_MS = 2_000;
+const MAX_RECENT_DEDUPE_RESPONSES = 64;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 export const GUIDE_ACTION_SYSTEM_PROMPT = [
   'You are the reasoning layer for a voice companion that guides users through public-service websites.',
   '',
-  'Return exactly one JSON object and no markdown. The object must be one of these actions:',
-  '- guide: { action, targetId, spokenInstruction, consequence?, expectedUserAction, language }',
-  '- explain: { action, targetId, spokenInstruction, language }',
-  '- scroll: { action, targetId }',
-  '- wait: { action }',
-  '- clarify: { action, spokenInstruction, language }',
-  '- success: { action, spokenInstruction, language }',
+  'Return exactly one JSON object and no markdown. Follow the response schema exactly.',
+  'The object must be one of these actions:',
+  '- guide: point to exactly one manual user action only when workflow.readiness is ready.',
+  '- explain: explain the supplied target without advancing the workflow.',
+  '- scroll: move attention to a supplied target without activating it.',
+  '- wait: wait for the user to finish the current manual step.',
+  '- clarify: ask one focused question when workflow.readiness is needs_clarification.',
+  '- success: report completion only when the page proves completion.',
+  'Every response must also include the workflow assessment object required by the schema.',
   '',
   'Rules:',
   '- Choose targetId only from the semantic elements supplied by the user message.',
@@ -29,13 +37,144 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   '- Keep spokenInstruction and consequence short and practical in the user\'s language style.',
   '- Set expectedUserAction to exactly one lowercase value: click, input, or select; never a sentence.',
   '- For an input target, tell the user to say “I\'m done” when they finish entering information.',
-  '- For a consequential guide target, include a short consequence sentence.',
+  '- First determine the user\'s intent and make a complete prerequisite plan before choosing any guide target.',
+  '- requiredInformation must list every decision or fact needed to carry out that intent, including applicable visible fields, choices, quantities, dates, destinations, reasons, identity checks, consent, and confirmation.',
+  '- Do not invent requirements unrelated to the intent. If the intent is only navigation or explanation, requiredInformation may be empty.',
+  '- Keep workflow.intent as a short task category, not a transcript or a user-provided value.',
+  '- knownInformation and missingInformation must contain requirement names/categories only, never the user\'s actual values.',
+  '- Treat the prior session.workflow as tentative planning memory and update it with the current utterance, recent manual actions, pending action, and current page.',
+  '- Count information as known only when the user explicitly supplied or confirmed it, or when a recent manual action clearly completed that exact control. Do not infer it from intent wording, a browser default, a prefilled value, hasValue, validationState, or a disabled/enabled state.',
+  '- A visible select option or default is not user confirmation. A text input with hasValue is not proof that the user intentionally entered or reviewed it.',
+  '- For a form task, a value spoken by the user describes what to enter; it does not prove that the corresponding control has been completed. Require the matching recent manual action, and require the explicit input-completion phrase before advancing from a text input.',
+  '- Before any final, send, submit, approve, consent, payment, transfer, or other consequential control, verify that every applicable prerequisite control has been manually completed or explicitly confirmed in the workflow and current session. Never jump from a verbal value directly to the final control.',
+  '- If any required information is unknown, ambiguous, contradictory, or not explicitly confirmed, set workflow.readiness to needs_clarification, list it in missingInformation, write one focused clarifyingQuestion, set action to clarify, and set targetId, consequence, and expectedUserAction to null.',
+  '- When clarification is needed, ask the earliest blocking question first. Do not guide a form field, navigation control, review control, or submission control until the required information is known.',
+  '- For action clarify, spokenInstruction must exactly repeat workflow.clarifyingQuestion.',
+  '- Only set workflow.readiness to ready when missingInformation is empty. Only a ready workflow may return guide.',
+  '- For non-task responses such as wait, explain, scroll, or success, use workflow.readiness not_applicable and leave missingInformation empty unless there is an active task plan.',
+  '- consequence is a hard safety requirement, not an optional stylistic field.',
+  '- Every guide object must include consequence. Use a short non-empty sentence for a consequential target; use null only for a non-consequential target.',
+  '- The supplied element safety.consequenceRequired value is authoritative. If it is true, consequence must be a non-empty sentence and must never be omitted, null, or empty.',
+  '- If you cannot state the consequence accurately, return clarify or wait instead of returning guide.',
+  '- Never return guide for a consequential target without consequence, even if the user asks for a quick next step.',
   '- Never treat hasValue or validationState as the user\'s completion signal for a text input. When session.pendingAction.type is input, wait for an explicit phrase such as "I\'m done", "finished", or "I have entered it" before advancing; explanation questions may be answered without advancing.',
   '- On a changed page, continue from the current semantic page and pending workflow. Do not restart at a global navigation item when a current-page target is available.',
-  '- On a review page, guide the unchecked confirmation control first; once it is checked, guide the enabled Submit Claim/final submission control instead of returning to global navigation.',
+  '- On a review page, guide the unchecked confirmation control first; once it is checked, guide the enabled final submission control instead of returning to global navigation.',
   '- When the current page indicates that the request was submitted or is complete, return success and do not guide another control.',
   '- If the next action is unclear, return clarify instead of guessing.',
+  '',
+  'Before returning any response, perform this checklist silently:',
+  '1. Identify the intent and enumerate the information required before execution.',
+  '2. Compare each requirement with explicit user statements, prior workflow metadata, recent manual actions, and the live page.',
+  '3. If anything is missing or ambiguous, return clarify and do not return guide.',
+  '4. If returning guide, find the exact targetId, read that element\'s safety.consequenceRequired value, and include a consequence when it is true.',
+  '5. Include all workflow fields; do not rely on omitted optional fields.',
+  '',
+  'Valid clarification shape:',
+  '{"action":"clarify","targetId":null,"spokenInstruction":"Which option do you want?","consequence":null,"expectedUserAction":null,"language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["option"],"knownInformation":[],"missingInformation":["option"],"readiness":"needs_clarification","clarifyingQuestion":"Which option do you want?"}}',
+  'Valid consequential guide shape:',
+  '{"action":"guide","targetId":"<target from elements>","spokenInstruction":"Review the details, then click the button yourself.","consequence":"This will submit your request.","expectedUserAction":"click","language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["request details"],"knownInformation":["request details"],"missingInformation":[],"readiness":"ready","clarifyingQuestion":null}}',
+  'Invalid shape — never guide while information is missing:',
+  '{"action":"guide","targetId":"<target from elements>","spokenInstruction":"Click Submit.","consequence":"This will submit your request.","expectedUserAction":"click","language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["amount"],"knownInformation":[],"missingInformation":["amount"],"readiness":"needs_clarification","clarifyingQuestion":"How much do you need?"}}',
 ].join('\n');
+
+export const GROQ_GUIDE_ACTION_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'guide_action',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['guide', 'explain', 'scroll', 'wait', 'clarify', 'success'],
+        },
+        targetId: { type: ['string', 'null'] },
+        spokenInstruction: { type: ['string', 'null'] },
+        consequence: { type: ['string', 'null'] },
+        expectedUserAction: {
+          type: ['string', 'null'],
+          enum: ['click', 'input', 'select', null],
+        },
+        language: { type: ['string', 'null'] },
+        workflow: {
+          type: 'object',
+          properties: {
+            intent: { type: ['string', 'null'] },
+            requiredInformation: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            knownInformation: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            missingInformation: {
+              type: 'array',
+              items: { type: 'string' },
+            },
+            readiness: {
+              type: 'string',
+              enum: ['ready', 'needs_clarification', 'not_applicable'],
+            },
+            clarifyingQuestion: { type: ['string', 'null'] },
+          },
+          required: [
+            'intent',
+            'requiredInformation',
+            'knownInformation',
+            'missingInformation',
+            'readiness',
+            'clarifyingQuestion',
+          ],
+          additionalProperties: false,
+        },
+      },
+      required: [
+        'action',
+        'targetId',
+        'spokenInstruction',
+        'consequence',
+        'expectedUserAction',
+        'language',
+        'workflow',
+      ],
+      additionalProperties: false,
+    },
+  },
+};
+
+let groqOperationSequence = 0;
+
+function nextGroqOperationId() {
+  groqOperationSequence += 1;
+  return `groq-${groqOperationSequence}`;
+}
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) {
+    return '[' + value.map(stableSerialize).join(',') + ']';
+  }
+  if (value && typeof value === 'object') {
+    return (
+      '{' +
+      Object.keys(value)
+        .sort()
+        .map((key) => JSON.stringify(key) + ':' + stableSerialize(value[key]))
+        .join(',') +
+      '}'
+    );
+  }
+  return JSON.stringify(value);
+}
+
+function requestSignature(request) {
+  return createHash('sha256')
+    .update(stableSerialize(request))
+    .digest('hex')
+    .slice(0, 16);
+}
 
 function firstNonEmpty(...values) {
   return values.find(
@@ -130,7 +269,19 @@ function buildUserMessage(request) {
     userUtterance: request.userUtterance,
     userLanguage: request.userLanguage,
     session: request.session,
-    page: request.page,
+    page: {
+      ...request.page,
+      elements: request.page.elements.map((element) => {
+        const consequenceType = classifyConsequence(element.label);
+        return {
+          ...element,
+          safety: {
+            consequenceRequired: Boolean(consequenceType),
+            consequenceType: consequenceType ?? null,
+          },
+        };
+      }),
+    },
   });
 }
 
@@ -151,7 +302,13 @@ export function buildGroqMessages(request) {
 
 async function responseJson(response, providerOperation) {
   if (!response.ok) {
-    throw new GroqHttpError(providerOperation, response);
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      // Keep the status-only error when the provider does not return JSON.
+    }
+    throw new GroqHttpError(providerOperation, response, payload);
   }
   try {
     return await response.json();
@@ -161,13 +318,27 @@ async function responseJson(response, providerOperation) {
 }
 
 class GroqHttpError extends Error {
-  constructor(providerOperation, response) {
+  constructor(providerOperation, response, payload) {
     super(
       'Groq ' + providerOperation + ' failed with HTTP ' + response.status + '.',
     );
     this.name = 'GroqHttpError';
     this.status = response.status;
     this.retryAfter = response.headers?.get?.('retry-after') ?? undefined;
+    this.providerRequestId =
+      typeof payload?.error?.request_id === 'string'
+        ? payload.error.request_id.slice(0, 120)
+        : typeof payload?.request_id === 'string'
+          ? payload.request_id.slice(0, 120)
+          : undefined;
+    this.providerErrorCode =
+      typeof payload?.error?.code === 'string'
+        ? payload.error.code.slice(0, 80)
+        : undefined;
+    this.providerErrorType =
+      typeof payload?.error?.type === 'string'
+        ? payload.error.type.slice(0, 80)
+        : undefined;
   }
 }
 
@@ -177,19 +348,19 @@ function positiveInteger(value, fallback) {
 
 function retryDelayMs(error, attempt, baseDelayMs) {
   const retryAfter = error instanceof GroqHttpError ? error.retryAfter : undefined;
-  if (retryAfter) {
+  if (retryAfter !== undefined) {
     const seconds = Number(retryAfter);
     if (Number.isFinite(seconds) && seconds >= 0) {
-      return Math.min(seconds * 1_000, MAX_RETRY_DELAY_MS);
+      return seconds * 1_000;
     }
 
-    const dateDelay = Date.parse(retryAfter) - Date.now();
-    if (Number.isFinite(dateDelay) && dateDelay > 0) {
-      return Math.min(dateDelay, MAX_RETRY_DELAY_MS);
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) {
+      return Math.max(0, retryAt - Date.now());
     }
   }
 
-  return Math.min(baseDelayMs * 2 ** (attempt - 1), MAX_RETRY_DELAY_MS);
+  return baseDelayMs * 2 ** (attempt - 1);
 }
 
 function isRetryable(error) {
@@ -224,7 +395,14 @@ async function requestWithRetry(request, options) {
         service: 'Groq reasoning',
         attempt: attempt + 1,
         delayMs,
-        ...(error instanceof GroqHttpError ? { status: error.status } : {}),
+        ...(error instanceof GroqHttpError
+          ? {
+              status: error.status,
+              ...(error.retryAfter !== undefined
+                ? { retryAfter: error.retryAfter }
+                : {}),
+            }
+          : {}),
       });
       await sleep(delayMs);
     }
@@ -259,20 +437,39 @@ function parseGroqContent(payload) {
   }
 }
 
-function normalizeGuideAction(value, elements) {
+function normalizeGuideAction(value, elements, workflowOverride) {
   if (
     typeof value !== 'object' ||
     value === null ||
-    Array.isArray(value) ||
-    value.action !== 'guide' ||
-    typeof value.targetId !== 'string'
+    Array.isArray(value)
   ) {
     return value;
   }
 
-  const target = elements.find((element) => element.id === value.targetId);
+  // Strict Structured Outputs represents optional fields as null. The
+  // provider-neutral contract represents fields that do not apply as absent.
+  const nullFreeValue = Object.fromEntries(
+    Object.entries(value).filter(([, fieldValue]) => fieldValue !== null),
+  );
+  const workflow =
+    workflowOverride ??
+    (value.workflow === undefined
+      ? undefined
+      : validateIntentReadiness(value.workflow));
+  const actionValue = Object.fromEntries(
+    Object.entries(nullFreeValue).filter(([key]) => key !== 'workflow'),
+  );
+
+  if (
+    actionValue.action !== 'guide' ||
+    typeof actionValue.targetId !== 'string'
+  ) {
+    return workflow ? { ...actionValue, workflow } : actionValue;
+  }
+
+  const target = elements.find((element) => element.id === actionValue.targetId);
   if (!target) {
-    return value;
+    return workflow ? { ...actionValue, workflow } : actionValue;
   }
 
   const expectedUserAction =
@@ -282,7 +479,232 @@ function normalizeGuideAction(value, elements) {
         ? 'select'
         : 'click';
 
-  return { ...value, expectedUserAction };
+  return {
+    ...actionValue,
+    expectedUserAction,
+    ...(workflow ? { workflow } : {}),
+  };
+}
+
+function fallbackClarifyingQuestion(missingInformation) {
+  const names = missingInformation
+    .map(safeWorkflowDiagnosticTerm)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((name) => name.slice(0, 72));
+  return names.length
+    ? `Please provide or confirm: ${names.join(', ')}.`
+    : 'Please clarify the information needed for this task.';
+}
+
+function redactWorkflowValue(value) {
+  return value
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted]')
+    .replace(/(?:₹|rs\.?|inr|\$|€|£)\s*[\d,]+(?:\.\d+)?/gi, '[redacted]')
+    .replace(/\b\d{5,18}\b/g, '[redacted]');
+}
+
+function sanitizeWorkflowAssessment(workflow) {
+  return {
+    ...(workflow.intent ? { intent: redactWorkflowValue(workflow.intent) } : {}),
+    requiredInformation: workflow.requiredInformation.map(redactWorkflowValue),
+    knownInformation: workflow.knownInformation.map(redactWorkflowValue),
+    missingInformation: workflow.missingInformation.map(redactWorkflowValue),
+    readiness: workflow.readiness,
+    ...(workflow.clarifyingQuestion
+      ? { clarifyingQuestion: redactWorkflowValue(workflow.clarifyingQuestion) }
+      : {}),
+  };
+}
+
+function normalizeModelWorkflow(value) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    typeof value.workflow !== 'object' ||
+    value.workflow === null ||
+    Array.isArray(value.workflow)
+  ) {
+    throw new Error('Groq response did not include an intent readiness assessment.');
+  }
+
+  const rawWorkflow = value.workflow;
+  const missingInformation = rawWorkflow.missingInformation;
+  const needsClarification =
+    Array.isArray(missingInformation) && missingInformation.length > 0;
+  const clarifyingQuestion =
+    typeof rawWorkflow.clarifyingQuestion === 'string'
+      ? rawWorkflow.clarifyingQuestion.trim()
+      : '';
+  const normalizedWorkflow = needsClarification
+    ? {
+        ...rawWorkflow,
+        readiness: 'needs_clarification',
+        clarifyingQuestion:
+          clarifyingQuestion || fallbackClarifyingQuestion(missingInformation),
+      }
+    : rawWorkflow;
+
+  return sanitizeWorkflowAssessment(
+    validateIntentReadiness(normalizedWorkflow),
+  );
+}
+
+function normalizeReadinessAction(value, elements, request) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    value.workflow === undefined
+  ) {
+    throw new Error('Groq response did not include an intent readiness assessment.');
+  }
+
+  const workflow = normalizeModelWorkflow(value);
+  const normalizedAction = normalizeGuideAction(value, elements, workflow);
+
+  if (workflow.readiness === 'needs_clarification') {
+    const language =
+      typeof normalizedAction?.language === 'string'
+        ? normalizedAction.language
+        : request.userLanguage ?? 'en-IN';
+    return {
+      action: 'clarify',
+      spokenInstruction: workflow.clarifyingQuestion,
+      language,
+      workflow,
+    };
+  }
+
+  return normalizedAction;
+}
+
+function targetSafetySummary(elements) {
+  const consequenceTargets = elements
+    .map((element) => ({
+      id: element.id,
+      type: classifyConsequence(element.label),
+    }))
+    .filter((target) => target.type);
+
+  return {
+    pageElementCount: elements.length,
+    consequenceTargetCount: consequenceTargets.length,
+    consequenceTargets,
+  };
+}
+
+function requestWorkflowSummary(request) {
+  const workflow = request.session.workflow;
+  return {
+    recentActionCount: request.session.recentActions.length,
+    pendingActionType: request.session.pendingAction?.type ?? null,
+    priorWorkflowReadiness: workflow?.readiness ?? null,
+    priorRequiredInformationCount: workflow?.requiredInformation?.length ?? 0,
+    priorKnownInformationCount: workflow?.knownInformation?.length ?? 0,
+    priorMissingInformationCount: workflow?.missingInformation?.length ?? 0,
+  };
+}
+
+function safeWorkflowDiagnosticTerm(value) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  return redactWorkflowValue(value)
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120);
+}
+
+function responseSafetySummary(value, elements) {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {
+      responseType: Array.isArray(value) ? 'array' : typeof value,
+    };
+  }
+
+  const targetId = typeof value.targetId === 'string'
+    ? value.targetId.slice(0, 80)
+    : undefined;
+  const target = targetId
+    ? elements.find((element) => element.id === targetId)
+    : undefined;
+  const consequence = typeof value.consequence === 'string'
+    ? value.consequence.trim()
+    : undefined;
+
+  const workflow =
+    value.workflow && typeof value.workflow === 'object'
+      ? value.workflow
+      : undefined;
+
+  return {
+    responseKeys: Object.keys(value).sort(),
+    action: typeof value.action === 'string' ? value.action : undefined,
+    targetId,
+    targetFound: Boolean(target),
+    targetConsequenceType: target ? classifyConsequence(target.label) ?? null : null,
+    consequenceRequired: Boolean(target && classifyConsequence(target.label)),
+    consequencePresent: Boolean(consequence),
+    consequenceLength: consequence?.length ?? 0,
+    expectedUserAction:
+      typeof value.expectedUserAction === 'string'
+        ? value.expectedUserAction
+        : value.expectedUserAction === null
+          ? null
+          : undefined,
+    language: typeof value.language === 'string' ? value.language : undefined,
+    workflowReadiness:
+      typeof workflow?.readiness === 'string' ? workflow.readiness : undefined,
+    requiredInformationCount: Array.isArray(workflow?.requiredInformation)
+      ? workflow.requiredInformation.length
+      : undefined,
+    knownInformationCount: Array.isArray(workflow?.knownInformation)
+      ? workflow.knownInformation.length
+      : undefined,
+    missingInformationCount: Array.isArray(workflow?.missingInformation)
+      ? workflow.missingInformation.length
+      : undefined,
+    clarifyingQuestionPresent:
+      typeof workflow?.clarifyingQuestion === 'string' &&
+      workflow.clarifyingQuestion.trim().length > 0,
+    ...(Array.isArray(workflow?.requiredInformation)
+      ? {
+          requiredInformation: workflow.requiredInformation
+            .map(safeWorkflowDiagnosticTerm)
+            .filter(Boolean),
+        }
+      : {}),
+    ...(Array.isArray(workflow?.missingInformation)
+      ? {
+          missingInformation: workflow.missingInformation
+            .map(safeWorkflowDiagnosticTerm)
+            .filter(Boolean),
+        }
+      : {}),
+  };
+}
+
+function usageCount(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+function responseUsageSummary(payload) {
+  const usage = payload?.usage;
+  const cachedPromptTokens = usageCount(
+    usage?.prompt_tokens_details?.cached_tokens,
+  );
+  return {
+    promptTokens: usageCount(usage?.prompt_tokens),
+    cachedPromptTokens,
+    completionTokens: usageCount(usage?.completion_tokens),
+    totalTokens: usageCount(usage?.total_tokens),
+    promptCacheHit: cachedPromptTokens !== null && cachedPromptTokens > 0,
+  };
 }
 
 function configuredBaseUrl(options) {
@@ -304,47 +726,174 @@ export function createGroqReasoner(options = {}) {
   const retryLogger = options.logger ?? console.warn;
   const baseUrl = configuredBaseUrl(options);
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const dedupeWindowMs = positiveInteger(
+    options.dedupeWindowMs,
+    DEFAULT_DEDUPE_WINDOW_MS,
+  );
+  const inFlightRequests = new Map();
+  const recentResponses = new Map();
+
+  const pruneRecentResponses = (now) => {
+    for (const [signature, entry] of recentResponses) {
+      if (entry.expiresAt <= now) {
+        recentResponses.delete(signature);
+      }
+    }
+    while (recentResponses.size > MAX_RECENT_DEDUPE_RESPONSES) {
+      const oldestSignature = recentResponses.keys().next().value;
+      if (oldestSignature === undefined) {
+        break;
+      }
+      recentResponses.delete(oldestSignature);
+    }
+  };
 
   return {
     async reason(request) {
       const model = modelFrom(options);
       const apiKey = apiKeyFrom(options);
       const endpoint = endpointFor(baseUrl);
+      const signature = requestSignature(request);
+      const operationId = nextGroqOperationId();
 
-      logger('[Groq call]');
-      try {
-        const payload = await requestWithRetry(async () => {
-          const response = await fetcher(endpoint, {
-            method: 'POST',
-            headers: {
-              accept: 'application/json',
-              authorization: 'Bearer ' + apiKey,
-              'content-type': 'application/json',
-            },
-            signal: timeoutSignal(timeoutMs),
-            body: JSON.stringify({
-              model,
-              messages: buildGroqMessages(request),
-              temperature: 0,
-              response_format: { type: 'json_object' },
-            }),
-          });
-          return responseJson(response, 'request');
-        }, {
-          ...options,
-          logger: retryLogger,
+      const inFlight = inFlightRequests.get(signature);
+      if (inFlight) {
+        logger('[Groq dedupe]', {
+          operationId,
+          requestSignature: signature,
+          reason: 'in-flight',
+          reusedOperationId: inFlight.operationId,
         });
-        return validateGuideAction(
-          normalizeGuideAction(parseGroqContent(payload), request.page.elements),
-          request.page.elements,
-        );
-      } catch (error) {
-        logger(
-          '[Groq error]',
-          errorMessage(error, 'Groq request failed.'),
-        );
-        throw error;
+        return inFlight.promise;
       }
+
+      const now = Date.now();
+      pruneRecentResponses(now);
+      const recent = recentResponses.get(signature);
+      if (recent && recent.expiresAt > now) {
+        logger('[Groq dedupe]', {
+          operationId,
+          requestSignature: signature,
+          reason: 'recent-response',
+          reusedOperationId: recent.operationId,
+        });
+        return recent.result;
+      }
+
+      let operationPromise;
+      operationPromise = (async () => {
+        let stage = 'request';
+        let finishReason;
+        let parsedAction;
+
+        logger('[Groq call]', {
+          operationId,
+          requestSignature: signature,
+          model,
+          ...requestWorkflowSummary(request),
+          ...targetSafetySummary(request.page.elements),
+        });
+        try {
+          const payload = await requestWithRetry(async () => {
+            const response = await fetcher(endpoint, {
+              method: 'POST',
+              headers: {
+                accept: 'application/json',
+                authorization: 'Bearer ' + apiKey,
+                'content-type': 'application/json',
+              },
+              signal: timeoutSignal(timeoutMs),
+              body: JSON.stringify({
+                model,
+                messages: buildGroqMessages(request),
+                temperature: 0,
+                response_format: GROQ_GUIDE_ACTION_RESPONSE_FORMAT,
+              }),
+            });
+            return responseJson(response, 'request');
+          }, {
+            ...options,
+            logger: (...args) => {
+              const [event, details] = args;
+              retryLogger(event, {
+                operationId,
+                ...(details ?? {}),
+              });
+            },
+          });
+          finishReason = payload?.choices?.[0]?.finish_reason;
+          stage = 'parse';
+          parsedAction = parseGroqContent(payload);
+          logger('[Groq response]', {
+            operationId,
+          requestSignature: signature,
+          model,
+          ...responseSafetySummary(parsedAction, request.page.elements),
+          ...responseUsageSummary(payload),
+        });
+          stage = 'readiness';
+          const normalizedAction = normalizeReadinessAction(
+            parsedAction,
+            request.page.elements,
+            request,
+          );
+          stage = 'validate';
+          return validateGuideAction(normalizedAction, request.page.elements);
+        } catch (error) {
+          logger(
+            '[Groq error]',
+            errorMessage(error, 'Groq request failed.'),
+            {
+              operationId,
+              requestSignature: signature,
+              model,
+              stage,
+              errorType: error instanceof Error ? error.name : typeof error,
+              ...(finishReason ? { finishReason } : {}),
+              ...(error instanceof GroqHttpError
+                ? {
+                    status: error.status,
+                    ...(error.providerRequestId
+                      ? { providerRequestId: error.providerRequestId }
+                      : {}),
+                    ...(error.providerErrorCode
+                      ? { providerErrorCode: error.providerErrorCode }
+                      : {}),
+                    ...(error.providerErrorType
+                      ? { providerErrorType: error.providerErrorType }
+                      : {}),
+                  }
+                : {}),
+              ...responseSafetySummary(parsedAction, request.page.elements),
+            },
+          );
+          throw error;
+        }
+      })();
+
+      inFlightRequests.set(signature, { operationId, promise: operationPromise });
+      operationPromise.then(
+        (result) => {
+          const current = inFlightRequests.get(signature);
+          if (current?.promise === operationPromise) {
+            inFlightRequests.delete(signature);
+          }
+          recentResponses.delete(signature);
+          recentResponses.set(signature, {
+            operationId,
+            result,
+            expiresAt: Date.now() + dedupeWindowMs,
+          });
+          pruneRecentResponses(Date.now());
+        },
+        () => {
+          const current = inFlightRequests.get(signature);
+          if (current?.promise === operationPromise) {
+            inFlightRequests.delete(signature);
+          }
+        },
+      );
+      return operationPromise;
     },
   };
 }

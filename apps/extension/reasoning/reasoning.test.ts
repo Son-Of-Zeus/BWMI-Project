@@ -181,6 +181,44 @@ describe('reasoning boundary', () => {
     });
   });
 
+  it('blocks guidance while the generic workflow assessment has missing information', () => {
+    const workflow = {
+      intent: 'complete a request',
+      requiredInformation: ['request details'],
+      knownInformation: [],
+      missingInformation: ['request details'],
+      readiness: 'needs_clarification' as const,
+      clarifyingQuestion: 'What details should I use for this request?',
+    };
+
+    expect(() =>
+      validateGuideAction(
+        {
+          action: 'guide',
+          targetId: 'el_1',
+          spokenInstruction: 'Click the request button.',
+          consequence: 'This will submit the request.',
+          expectedUserAction: 'click',
+          language: 'en-IN',
+          workflow,
+        },
+        ['el_1'],
+      ),
+    ).toThrow(/cannot guide while intent information is missing/);
+
+    expect(
+      validateGuideAction(
+        {
+          action: 'clarify',
+          spokenInstruction: workflow.clarifyingQuestion,
+          language: 'en-IN',
+          workflow,
+        },
+        ['el_1'],
+      ),
+    ).toMatchObject({ action: 'clarify', workflow });
+  });
+
   it('validates target-free recovery actions and rejects executable instructions', () => {
     expect(
       validateGuideAction(
@@ -349,6 +387,33 @@ describe('reasoning boundary', () => {
       userUtterance: 'Help',
       session: { recentActions: [] },
       page: { elements: [elements[0]] },
+    });
+  });
+
+  it('carries only bounded workflow status and redacts likely values', () => {
+    const request = sanitizeReasonRequest({
+      userUtterance: 'I need help',
+      session: {
+        recentActions: [],
+        workflow: {
+          intent: 'complete a request for 50000',
+          requiredInformation: ['amount'],
+          knownInformation: ['amount 50000'],
+          missingInformation: ['reason'],
+          readiness: 'needs_clarification',
+          clarifyingQuestion: 'What is the reason?',
+        },
+      },
+      page: { elements: [] },
+    });
+
+    expect(request.session.workflow).toEqual({
+      intent: 'complete a request for [redacted]',
+      requiredInformation: ['amount'],
+      knownInformation: ['amount [redacted]'],
+      missingInformation: ['reason'],
+      readiness: 'needs_clarification',
+      clarifyingQuestion: 'What is the reason?',
     });
   });
 

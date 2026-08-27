@@ -198,6 +198,33 @@ describe('PF flow controller', () => {
     });
   });
 
+  it('persists generic readiness metadata so later voice turns retain the clarification plan', async () => {
+    const workflow = {
+      intent: 'complete a request',
+      requiredInformation: ['request details'],
+      knownInformation: [],
+      missingInformation: ['request details'],
+      readiness: 'needs_clarification' as const,
+      clarifyingQuestion: 'What details should I use for this request?',
+    };
+    const clarifyAction: GuideAction = {
+      action: 'clarify',
+      spokenInstruction: workflow.clarifyingQuestion,
+      language: 'en-IN',
+      workflow,
+    };
+    const harness = createHarness([clarifyAction]);
+    harness.flow.start();
+
+    await expect(harness.flow.requestVoice()).resolves.toMatchObject({
+      status: 'completed',
+      action: clarifyAction,
+      guide: { status: 'completed', action: 'clarify' },
+    });
+    expect(harness.session.getState().workflow).toEqual(workflow);
+    expect(harness.session.getState().pendingAction).toBeUndefined();
+  });
+
   it('waits for an explicit input completion phrase instead of advancing on validation', async () => {
     const inputAction: GuideAction = {
       ...guideAction,
@@ -353,6 +380,43 @@ describe('PF flow controller', () => {
 
     expect(harness.reasoner.reason).toHaveBeenCalledTimes(2);
     expect(harness.flow.getSnapshot().phase).toBe('success');
+  });
+
+  it('coalesces repeated continuation events while reasoning is in flight', async () => {
+    const nextAction: GuideAction = { action: 'wait' };
+    const harness = createHarness([guideAction, nextAction]);
+    harness.flow.start();
+    await harness.flow.requestVoice();
+
+    let releaseReasoning!: (action: GuideAction) => void;
+    const pendingReasoning = new Promise<GuideAction>((resolve) => {
+      releaseReasoning = resolve;
+    });
+    harness.reasoner.reason = vi.fn(() => pendingReasoning);
+
+    harness.interactions.emit({
+      type: 'navigation',
+      url: 'http://localhost:5173/claims/review',
+      previousUrl: 'http://localhost:5173/dashboard',
+      reason: 'push-state',
+      timestamp: 1,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    harness.interactions.emit({
+      type: 'navigation',
+      url: 'http://localhost:5173/claims/review',
+      previousUrl: 'http://localhost:5173/dashboard',
+      reason: 'url-poll',
+      timestamp: 2,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+    releaseReasoning(nextAction);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    expect(harness.reasoner.reason).toHaveBeenCalledTimes(1);
+    expect(harness.guide.run).toHaveBeenCalledTimes(2);
   });
 
   it('keeps guidance active after an unmatched page interaction', async () => {

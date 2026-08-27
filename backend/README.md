@@ -26,12 +26,28 @@ optional `GROQ_MODEL` and `GROQ_API_BASE_URL` overrides. The default Groq model
 is `openai/gpt-oss-120b`; Sarvam model, speaker, and language settings are also
 environment-configurable. Speech requests automatically retry transient
 network, rate-limit, and upstream server failures up to three times, respecting
-short `Retry-After` delays. Reasoning requests use the Node HTTPS transport
-with IPv4 preference and the same bounded retry behavior. Permanent provider
-rejections are returned without retrying. Set `SARVAM_LOG_RESPONSES=true` to log parsed STT and TTS provider
-responses (including error bodies) in the backend console. TTS audio is logged
-as a compact base64-length summary instead of the full audio payload. STT logs
-can contain transcripts and timestamps, so disable them after debugging.
+the provider's `Retry-After` value when present. Reasoning requests use the
+Node HTTPS transport with IPv4 preference and the same bounded retry behavior;
+when no usable header is provided, the configured exponential fallback is used.
+Permanent provider rejections are returned without retrying. The Groq adapter uses strict
+structured output for `openai/gpt-oss-120b`; the model must include a generic
+intent-readiness assessment before it can return `guide`. If that assessment
+reports missing or ambiguous information, the adapter safely returns
+`clarify`, even if the model selected a target. Consequence-aware validation
+still remains a server-side safety gate. Groq response/error logs include an
+operation ID, readiness state, bounded requirement counts/names, response keys,
+target safety classification, and consequence presence/length, but never the
+prompt, user utterance, or spoken text. Groq prompt caching is automatic for
+GPT-OSS-120B when requests share an exact prefix; the stable system prompt is
+kept first, and response logs expose `promptTokens`, `cachedPromptTokens`, and
+`promptCacheHit` so cache hits can be verified without logging prompt content.
+Sarvam retry and terminal
+error logs include an operation ID and a safe reason such as `invalid-json`,
+`empty-audios`, `invalid-base64`, or `transport`. Set
+`SARVAM_LOG_RESPONSES=true` to log parsed STT and TTS provider responses
+(including error bodies) in the backend console. TTS audio is logged as a
+compact base64-length summary instead of the full audio payload. STT logs can
+contain transcripts and timestamps, so disable them after debugging.
 Provider secrets stay in the backend process and never enter the extension
 bundle.
 
@@ -47,9 +63,17 @@ The implementation is split into `src/contracts.js` (validation),
 transport). The backend test files cover transport, provider request shapes,
 response mapping, and safety boundaries.
 
-When the Groq adapter is active, the backend logs `[Groq call]`
-immediately before each reasoning request without logging the prompt or page
-context.
+When the Groq adapter is active, the backend logs `[Groq call]` immediately
+before each upstream reasoning request and `[Groq response]` after a parsed
+response. It also coalesces identical in-flight requests and reuses a
+successful response for a short two-second window; these events are logged as
+`[Groq dedupe]` with `reason: "in-flight"` or `reason: "recent-response"`.
+The `requestSignature` is a short one-way fingerprint for correlating duplicate
+requests and is not the request content. The associated metadata contains only
+the model, operation ID, bounded workflow status/counts/names, element count,
+and consequence-target IDs/types; it does not log the prompt, page labels, user
+utterance, API key, or spoken text. Workflow names in diagnostics are redacted
+for likely email, currency, phone, and long-number values.
 
 ## Endpoints
 
@@ -86,7 +110,32 @@ Input:
 }
 ```
 
-Output must match the strict `GuideAction` schema.
+Output must match the strict `GuideAction` schema and include the generic
+`workflow` assessment:
+
+```json
+{
+  "action": "clarify",
+  "targetId": null,
+  "spokenInstruction": "Which option do you need?",
+  "consequence": null,
+  "expectedUserAction": null,
+  "language": "en-IN",
+  "workflow": {
+    "intent": "complete the requested task",
+    "requiredInformation": ["option"],
+    "knownInformation": [],
+    "missingInformation": ["option"],
+    "readiness": "needs_clarification",
+    "clarifyingQuestion": "Which option do you need?"
+  }
+}
+```
+
+`guide` is accepted only when `workflow.readiness` is `ready` and
+`missingInformation` is empty. Requirement arrays contain names/categories,
+not user values. The extension retains this bounded status between voice turns
+so the model can continue a multi-turn clarification safely.
 
 ## `/speech/transcribe`
 

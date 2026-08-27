@@ -10,7 +10,7 @@ It does not manipulate the browser.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them.
+The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint and bounded intent-readiness memory, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them. The flow coalesces repeated continuation triggers while a page transition or reasoning request is already in flight, and suppresses an identical completed request for a short debounce window.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -36,6 +36,7 @@ type ReasonRequest = {
       type: string;
       targetLabel?: string;
     };
+    workflow?: IntentReadiness;
   };
   page: {
     title?: string;
@@ -57,7 +58,13 @@ Do not send:
 
 ## Output
 
-Use strict structured output.
+Use strict structured output. The Groq `openai/gpt-oss-120b` adapter requires
+all response fields in its provider schema; fields that do not apply are
+represented as `null`, then normalized back to this provider-neutral contract.
+Every model response also contains a generic readiness assessment. A response
+with missing or ambiguous information is converted to `clarify` before it can
+reach the guide controller. The live safety gate still requires a non-empty
+consequence for consequential targets.
 
 ```ts
 type GuideAction =
@@ -93,6 +100,28 @@ type GuideAction =
       language: string;
     };
 ```
+
+```ts
+type IntentReadiness = {
+  intent?: string;
+  requiredInformation: string[];
+  knownInformation: string[];
+  missingInformation: string[];
+  readiness: "ready" | "needs_clarification" | "not_applicable";
+  clarifyingQuestion?: string;
+};
+```
+
+Every `GuideAction` may carry `workflow?: IntentReadiness` as bounded planning
+metadata for the next voice turn.
+
+`requiredInformation`, `knownInformation`, and `missingInformation` contain
+requirement names only, never submitted values. `hasValue`, browser validity,
+prefilled values, and default selections do not prove that the user supplied or
+confirmed information. A `guide` response is valid only when readiness is
+`ready`; a `clarify` response must carry a focused question and the missing
+requirements. The extension retains this bounded assessment between voice
+turns so a multi-turn clarification does not forget earlier answers.
 
 ## Instruction Style
 
@@ -146,7 +175,15 @@ If no target is sufficiently clear:
 {
   "action": "clarify",
   "spokenInstruction": "Aap claim withdraw karna chahte hain ya claim status dekhna?",
-  "language": "hi-IN"
+  "language": "hi-IN",
+  "workflow": {
+    "intent": "the user's task",
+    "requiredInformation": ["task choice"],
+    "knownInformation": [],
+    "missingInformation": ["task choice"],
+    "readiness": "needs_clarification",
+    "clarifyingQuestion": "Aap claim withdraw karna chahte hain ya claim status dekhna?"
+  }
 }
 ```
 

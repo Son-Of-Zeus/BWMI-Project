@@ -9,10 +9,13 @@ preserving the extension's small, provider-neutral contracts.
 
 `backend/src/server.js` exposes `POST /reason`, `POST /speech/transcribe`, and
 `POST /speech/synthesize`. The normal adapters call Groq's OpenAI-compatible
-Chat Completions endpoint and Sarvam's REST STT/TTS endpoints. `backend/src/contracts.js` validates
+Chat Completions endpoint and Sarvam's REST STT/TTS endpoints. Groq requests
+honor the provider's `Retry-After` header and coalesce duplicate in-flight or
+immediately repeated requests. `backend/src/contracts.js` validates
 semantic-only requests, strict `GuideAction` responses, language hints,
-consequence text, and bounded speech payloads. Raw DOM references, disabled
-guide targets, unknown target IDs, and executable instruction text are rejected.
+consequence text, generic intent-readiness metadata, and bounded speech
+payloads. Raw DOM references, disabled guide targets, unknown target IDs,
+missing-prerequisite guidance, and executable instruction text are rejected.
 
 Set `PROTOTYPE_MODE=true` to use deterministic offline adapters. The normal
 server requires `GROQ_API_KEY`, `GROQ_MODEL` is optional, and

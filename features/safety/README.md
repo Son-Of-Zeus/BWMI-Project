@@ -81,6 +81,7 @@ Reject responses when:
 - target does not exist
 - target is stale
 - required fields are missing
+- intent readiness reports missing or ambiguous information for a guide action
 - model tries to provide executable code
 - model requests autonomous consequential action
 
@@ -89,6 +90,11 @@ Reject responses when:
 Before a consequential action, the model response must include a short
 consequence explanation. The guide speaks it before the manual-action
 instruction.
+
+The generic intent-readiness assessment is checked first. A `guide` action is
+not accepted while `missingInformation` is non-empty; the model must return a
+focused `clarify` question instead. Requirement names are bounded metadata and
+must never contain submitted values.
 
 Example:
 

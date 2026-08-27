@@ -8,15 +8,38 @@ const DEFAULT_TTS_SPEAKER = 'shubh';
 const DEFAULT_TTS_LANGUAGE = 'hi-IN';
 const DEFAULT_MAX_ATTEMPTS = 3;
 const DEFAULT_RETRY_DELAY_MS = 250;
-const MAX_RETRY_DELAY_MS = 2_000;
 const RETRYABLE_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
+let sarvamOperationSequence = 0;
+
+function nextSarvamOperationId(prefix) {
+  sarvamOperationSequence += 1;
+  return `${prefix}-${sarvamOperationSequence}`;
+}
+
+class SarvamPayloadError extends Error {
+  constructor(serviceName, reason, message) {
+    super(message);
+    this.name = 'SarvamPayloadError';
+    this.reason = reason;
+    this.serviceName = serviceName;
+  }
+}
+
 class SarvamHttpError extends Error {
-  constructor(serviceName, response) {
+  constructor(serviceName, response, payload) {
     super(`${serviceName} returned HTTP ${response.status}.`);
     this.name = 'SarvamHttpError';
     this.status = response.status;
     this.retryAfter = response.headers?.get?.('retry-after') ?? undefined;
+    this.providerRequestId =
+      typeof payload?.request_id === 'string'
+        ? payload.request_id.slice(0, 120)
+        : undefined;
+    this.providerErrorCode =
+      typeof payload?.error?.code === 'string'
+        ? payload.error.code.slice(0, 80)
+        : undefined;
   }
 }
 
@@ -64,19 +87,19 @@ function positiveInteger(value, fallback) {
 
 function retryDelayMs(error, attempt, baseDelayMs) {
   const retryAfter = error instanceof SarvamHttpError ? error.retryAfter : undefined;
-  if (retryAfter) {
+  if (retryAfter !== undefined) {
     const seconds = Number(retryAfter);
     if (Number.isFinite(seconds) && seconds >= 0) {
-      return Math.min(seconds * 1_000, MAX_RETRY_DELAY_MS);
+      return seconds * 1_000;
     }
 
-    const dateDelay = Date.parse(retryAfter) - Date.now();
-    if (Number.isFinite(dateDelay) && dateDelay > 0) {
-      return Math.min(dateDelay, MAX_RETRY_DELAY_MS);
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) {
+      return Math.max(0, retryAt - Date.now());
     }
   }
 
-  return Math.min(baseDelayMs * 2 ** (attempt - 1), MAX_RETRY_DELAY_MS);
+  return baseDelayMs * 2 ** (attempt - 1);
 }
 
 function isRetryable(error) {
@@ -84,6 +107,44 @@ function isRetryable(error) {
     !(error instanceof SarvamHttpError) ||
     RETRYABLE_STATUS_CODES.has(error.status)
   );
+}
+
+function retryReason(error) {
+  if (error instanceof SarvamPayloadError) {
+    return error.reason;
+  }
+  if (error instanceof SarvamHttpError) {
+    return `http-${error.status}`;
+  }
+  if (error?.name === 'AbortError' || error?.code === 'ETIMEDOUT') {
+    return 'timeout';
+  }
+  if (typeof error?.code === 'string' && /^[A-Z0-9_]+$/.test(error.code)) {
+    return `transport-${error.code}`;
+  }
+  return 'transport';
+}
+
+function retryLogDetails(error, serviceName, operationId) {
+  return {
+    operationId,
+    service: serviceName,
+    reason: retryReason(error),
+    ...(error instanceof SarvamHttpError
+      ? {
+          status: error.status,
+          ...(error.retryAfter !== undefined
+            ? { retryAfter: error.retryAfter }
+            : {}),
+          ...(error.providerRequestId
+            ? { providerRequestId: error.providerRequestId }
+            : {}),
+          ...(error.providerErrorCode
+            ? { providerErrorCode: error.providerErrorCode }
+            : {}),
+        }
+      : {}),
+  };
 }
 
 async function requestWithRetry(request, options) {
@@ -103,15 +164,18 @@ async function requestWithRetry(request, options) {
     } catch (error) {
       lastError = error;
       if (attempt === maxAttempts || !isRetryable(error)) {
+        options.logger?.(
+          '[Sarvam error]',
+          retryLogDetails(error, options.serviceName, options.operationId),
+        );
         throw error;
       }
 
       const delayMs = retryDelayMs(error, attempt, baseDelayMs);
       options.logger?.('[Sarvam retry]', {
-        service: options.serviceName,
+        ...retryLogDetails(error, options.serviceName, options.operationId),
         attempt: attempt + 1,
         delayMs,
-        ...(error instanceof SarvamHttpError ? { status: error.status } : {}),
       });
       await sleep(delayMs);
     }
@@ -139,21 +203,28 @@ async function jsonResponse(
   serviceName,
   logger,
   summarizeAudio = false,
+  operationId,
 ) {
   let payload;
   try {
     payload = await response.json();
   } catch {
     logger?.('[Sarvam response]', {
+      operationId,
       service: serviceName,
       status: response.status,
       ok: response.ok,
       body: '<non-JSON response>',
     });
-    throw new Error(`${serviceName} returned invalid JSON.`);
+    throw new SarvamPayloadError(
+      serviceName,
+      'invalid-json',
+      `${serviceName} returned invalid JSON.`,
+    );
   }
 
   logger?.('[Sarvam response]', {
+    operationId,
     service: serviceName,
     status: response.status,
     ok: response.ok,
@@ -161,7 +232,7 @@ async function jsonResponse(
   });
 
   if (!response.ok) {
-    throw new SarvamHttpError(serviceName, response);
+    throw new SarvamHttpError(serviceName, response, payload);
   }
 
   return payload;
@@ -174,17 +245,29 @@ function decodeTtsAudio(payload) {
     ? payload.audios.filter((audio) => typeof audio === 'string' && audio.length > 0)
     : [];
   if (audioParts.length === 0) {
-    throw new Error('Sarvam text-to-speech returned no audio.');
+    throw new SarvamPayloadError(
+      'Sarvam text-to-speech',
+      'empty-audios',
+      'Sarvam text-to-speech returned no audio.',
+    );
   }
 
   const encodedAudio = audioParts.join('').replace(/\s+/g, '');
   if (!BASE64_AUDIO_PATTERN.test(encodedAudio)) {
-    throw new Error('Sarvam text-to-speech returned invalid audio.');
+    throw new SarvamPayloadError(
+      'Sarvam text-to-speech',
+      'invalid-base64',
+      'Sarvam text-to-speech returned invalid audio.',
+    );
   }
 
   const audio = Buffer.from(encodedAudio, 'base64');
   if (audio.length === 0) {
-    throw new Error('Sarvam text-to-speech returned empty audio.');
+    throw new SarvamPayloadError(
+      'Sarvam text-to-speech',
+      'decoded-empty-audio',
+      'Sarvam text-to-speech returned empty audio.',
+    );
   }
   return audio;
 }
@@ -205,6 +288,7 @@ export function createSarvamTranscriber(options = {}) {
     async transcribe({ audio, contentType }) {
       const apiKey = apiKeyFrom(options);
       const form = new FormData();
+      const operationId = nextSarvamOperationId('sarvam-stt');
       const blob = new Blob([audio], { type: mediaType(contentType) });
       form.append('file', blob, `voice.${extensionFor(contentType)}`);
       form.append('model', model);
@@ -219,11 +303,18 @@ export function createSarvamTranscriber(options = {}) {
           headers: { 'api-subscription-key': apiKey },
           body: form,
         });
-        return jsonResponse(response, 'Sarvam speech-to-text', logger);
+        return jsonResponse(
+          response,
+          'Sarvam speech-to-text',
+          logger,
+          false,
+          operationId,
+        );
       }, {
         ...options,
         logger: retryLogger,
         serviceName: 'Sarvam speech-to-text',
+        operationId,
       });
       return validateSpeechResult({
         transcript: payload?.transcript,
@@ -250,6 +341,7 @@ export function createSarvamSynthesizer(options = {}) {
   return {
     async synthesize(input) {
       const apiKey = apiKeyFrom(options);
+      const operationId = nextSarvamOperationId('sarvam-tts');
       return requestWithRetry(async () => {
         const response = await fetcher(endpointFor(baseUrl, '/text-to-speech'), {
           method: 'POST',
@@ -264,7 +356,13 @@ export function createSarvamSynthesizer(options = {}) {
             speaker,
           }),
         });
-        const payload = await jsonResponse(response, 'Sarvam text-to-speech', logger, true);
+        const payload = await jsonResponse(
+          response,
+          'Sarvam text-to-speech',
+          logger,
+          true,
+          operationId,
+        );
         return {
           audio: decodeTtsAudio(payload),
           mimeType: 'audio/wav',
@@ -273,6 +371,7 @@ export function createSarvamSynthesizer(options = {}) {
         ...options,
         logger: options.logger ?? console.warn,
         serviceName: 'Sarvam text-to-speech',
+        operationId,
       });
     },
   };

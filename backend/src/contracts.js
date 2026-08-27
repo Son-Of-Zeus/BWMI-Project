@@ -12,8 +12,15 @@ const SEMANTIC_ROLES = new Set([
 
 const VALIDATION_STATES = new Set(['valid', 'invalid', 'unknown']);
 const EXPECTED_ACTIONS = new Set(['click', 'input', 'select']);
+const READINESS_STATES = new Set([
+  'ready',
+  'needs_clarification',
+  'not_applicable',
+]);
 const MAX_TEXT_LENGTH = 2_000;
 const MAX_INSTRUCTION_LENGTH = 240;
+const MAX_READINESS_ITEM_LENGTH = 120;
+const MAX_READINESS_ITEMS = 12;
 
 export class ContractValidationError extends Error {
   constructor(message) {
@@ -62,6 +69,17 @@ function requireBoolean(value, field) {
     throw new ContractValidationError(`${field} must be a boolean`);
   }
   return value;
+}
+
+function validateReadinessItems(value, field) {
+  const items = requireArray(value, field);
+  if (items.length > MAX_READINESS_ITEMS) {
+    throw new ContractValidationError(`${field} exceeds the maximum count`);
+  }
+
+  return items.map((item, index) =>
+    requireString(item, `${field}[${index}]`, MAX_READINESS_ITEM_LENGTH),
+  );
 }
 
 function requireAllowedKeys(value, allowedKeys, field) {
@@ -125,6 +143,88 @@ function validateSemanticElement(value, index) {
   };
 }
 
+/**
+ * Validate the model's generic intent/readiness assessment.
+ *
+ * This metadata contains requirement names and status only. It must never be
+ * used as a transport for the user's actual form values.
+ */
+export function validateIntentReadiness(value, field = 'workflow') {
+  const workflow = requireRecord(value, field);
+  requireAllowedKeys(
+    workflow,
+    [
+      'intent',
+      'requiredInformation',
+      'knownInformation',
+      'missingInformation',
+      'readiness',
+      'clarifyingQuestion',
+    ],
+    field,
+  );
+
+  const intent =
+    workflow.intent === null || workflow.intent === undefined
+      ? undefined
+      : requireString(workflow.intent, `${field}.intent`, 160);
+  const requiredInformation = validateReadinessItems(
+    workflow.requiredInformation,
+    `${field}.requiredInformation`,
+  );
+  const knownInformation = validateReadinessItems(
+    workflow.knownInformation,
+    `${field}.knownInformation`,
+  );
+  const missingInformation = validateReadinessItems(
+    workflow.missingInformation,
+    `${field}.missingInformation`,
+  );
+  const readiness = requireString(workflow.readiness, `${field}.readiness`, 32);
+  if (!READINESS_STATES.has(readiness)) {
+    throw new ContractValidationError(`${field}.readiness is not supported`);
+  }
+  const clarifyingQuestion =
+    workflow.clarifyingQuestion === null || workflow.clarifyingQuestion === undefined
+      ? undefined
+      : requireInstruction(
+          workflow.clarifyingQuestion,
+          `${field}.clarifyingQuestion`,
+        );
+
+  if (missingInformation.length > 0 && readiness !== 'needs_clarification') {
+    throw new ContractValidationError(
+      `${field}.readiness must be needs_clarification when information is missing`,
+    );
+  }
+  if (readiness === 'needs_clarification') {
+    if (missingInformation.length === 0) {
+      throw new ContractValidationError(
+        `${field}.missingInformation is required for clarification`,
+      );
+    }
+    if (!clarifyingQuestion) {
+      throw new ContractValidationError(
+        `${field}.clarifyingQuestion is required for clarification`,
+      );
+    }
+  }
+  if (readiness !== 'needs_clarification' && clarifyingQuestion) {
+    throw new ContractValidationError(
+      `${field}.clarifyingQuestion is only allowed when clarification is needed`,
+    );
+  }
+
+  return {
+    ...(intent ? { intent } : {}),
+    requiredInformation,
+    knownInformation,
+    missingInformation,
+    readiness,
+    ...(clarifyingQuestion ? { clarifyingQuestion } : {}),
+  };
+}
+
 export function validateReasonRequest(value) {
   const request = requireRecord(value, 'reason request');
   requireAllowedKeys(
@@ -134,7 +234,11 @@ export function validateReasonRequest(value) {
   );
 
   const session = requireRecord(request.session, 'session');
-  requireAllowedKeys(session, ['goal', 'recentActions', 'pendingAction'], 'session');
+  requireAllowedKeys(
+    session,
+    ['goal', 'recentActions', 'pendingAction', 'workflow'],
+    'session',
+  );
   const recentActions = requireArray(session.recentActions, 'session.recentActions');
   const normalizedActions = recentActions.slice(-8).map((action, index) => {
     const normalized = requireRecord(action, `session.recentActions[${index}]`);
@@ -172,6 +276,11 @@ export function validateReasonRequest(value) {
     };
   }
 
+  const workflow =
+    session.workflow === undefined
+      ? undefined
+      : validateIntentReadiness(session.workflow, 'session.workflow');
+
   const page = requireRecord(request.page, 'page');
   requireAllowedKeys(page, ['title', 'section', 'elements'], 'page');
   const elements = requireArray(page.elements, 'page.elements');
@@ -190,6 +299,7 @@ export function validateReasonRequest(value) {
         : {}),
       recentActions: normalizedActions,
       ...(pendingAction ? { pendingAction } : {}),
+      ...(workflow ? { workflow } : {}),
     },
     page: {
       ...(page.title !== undefined ? { title: requireString(page.title, 'page.title') } : {}),
@@ -234,13 +344,46 @@ export function validateGuideAction(value, elements) {
   const action = requireRecord(value, 'GuideAction');
   const availableElements = elements ?? [];
   const actionType = requireString(action.action, 'GuideAction.action', 16);
+  const workflow =
+    action.workflow === undefined
+      ? undefined
+      : validateIntentReadiness(action.workflow, 'GuideAction.workflow');
+
+  const workflowFields = ['workflow'];
+  const enforceGuideReadiness = () => {
+    if (!workflow) {
+      return;
+    }
+    if (
+      workflow.readiness === 'needs_clarification' ||
+      workflow.missingInformation.length > 0
+    ) {
+      throw new ContractValidationError(
+        'GuideAction cannot guide while intent information is missing',
+      );
+    }
+    if (workflow.readiness !== 'ready') {
+      throw new ContractValidationError(
+        'GuideAction requires a ready intent assessment',
+      );
+    }
+  };
 
   if (actionType === 'guide') {
     requireAllowedKeys(
       action,
-      ['action', 'targetId', 'spokenInstruction', 'consequence', 'expectedUserAction', 'language'],
+      [
+        'action',
+        'targetId',
+        'spokenInstruction',
+        'consequence',
+        'expectedUserAction',
+        'language',
+        ...workflowFields,
+      ],
       'GuideAction',
     );
+    enforceGuideReadiness();
     const targetId = requireString(action.targetId, 'targetId', 80);
     const target = targetById(availableElements, targetId);
     if (target.disabled) {
@@ -270,11 +413,16 @@ export function validateGuideAction(value, elements) {
       ...(consequence ? { consequence } : {}),
       expectedUserAction,
       language: requireString(action.language, 'language', 24),
+      ...(workflow ? { workflow } : {}),
     };
   }
 
   if (actionType === 'explain') {
-    requireAllowedKeys(action, ['action', 'targetId', 'spokenInstruction', 'language'], 'GuideAction');
+    requireAllowedKeys(
+      action,
+      ['action', 'targetId', 'spokenInstruction', 'language', ...workflowFields],
+      'GuideAction',
+    );
     const targetId = requireString(action.targetId, 'targetId', 80);
     targetById(availableElements, targetId);
     return {
@@ -282,26 +430,45 @@ export function validateGuideAction(value, elements) {
       targetId,
       spokenInstruction: requireInstruction(action.spokenInstruction, 'spokenInstruction'),
       language: requireString(action.language, 'language', 24),
+      ...(workflow ? { workflow } : {}),
     };
   }
 
   if (actionType === 'scroll') {
-    requireAllowedKeys(action, ['action', 'targetId'], 'GuideAction');
+    requireAllowedKeys(action, ['action', 'targetId', ...workflowFields], 'GuideAction');
     targetById(availableElements, action.targetId);
-    return { action: 'scroll', targetId: requireString(action.targetId, 'targetId', 80) };
+    return {
+      action: 'scroll',
+      targetId: requireString(action.targetId, 'targetId', 80),
+      ...(workflow ? { workflow } : {}),
+    };
   }
 
   if (actionType === 'wait') {
-    requireAllowedKeys(action, ['action'], 'GuideAction');
-    return { action: 'wait' };
+    requireAllowedKeys(action, ['action', ...workflowFields], 'GuideAction');
+    return { action: 'wait', ...(workflow ? { workflow } : {}) };
   }
 
   if (actionType === 'clarify' || actionType === 'success') {
-    requireAllowedKeys(action, ['action', 'spokenInstruction', 'language'], 'GuideAction');
+    requireAllowedKeys(
+      action,
+      ['action', 'spokenInstruction', 'language', ...workflowFields],
+      'GuideAction',
+    );
+    if (
+      workflow &&
+      actionType === 'clarify' &&
+      workflow.readiness !== 'needs_clarification'
+    ) {
+      throw new ContractValidationError(
+        'Clarify action requires a needs_clarification intent assessment',
+      );
+    }
     return {
       action: actionType,
       spokenInstruction: requireInstruction(action.spokenInstruction, 'spokenInstruction'),
       language: requireString(action.language, 'language', 24),
+      ...(workflow ? { workflow } : {}),
     };
   }
 

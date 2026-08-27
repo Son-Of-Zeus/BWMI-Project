@@ -11,6 +11,7 @@ import type {
 import {
   buildReasonRequest,
   type GuideAction,
+  type ReasonRequest,
   type Reasoner,
   type ReasoningPage,
 } from '../reasoning/reasoning';
@@ -26,6 +27,8 @@ import {
   type LatencyMetric,
   type LatencyStage,
 } from '../runtime/latency';
+
+const REASONING_DEDUPE_WINDOW_MS = 2_000;
 
 export type FlowPhase =
   | 'stopped'
@@ -185,6 +188,16 @@ export function createFlowController(
   let pageSubscription: (() => void) | undefined;
   let interactionSubscription: (() => void) | undefined;
   let continuationTimer: ReturnType<typeof setTimeout> | undefined;
+  let continuationInFlight = false;
+  let continuationRequested = false;
+  let pageRevision = 0;
+  let pageFingerprint: string | undefined;
+  let inFlightReasoning:
+    | { key: string; promise: Promise<GuideAction> }
+    | undefined;
+  let lastReasoning:
+    | { key: string; result: FlowResult; expiresAt: number }
+    | undefined;
   const now = options.now ?? (() => performance.now());
 
   const measure = async <Result>(
@@ -237,6 +250,11 @@ export function createFlowController(
       options.registry.reconcile(discoverSemanticElements(documentNode));
       return pageFromSnapshot(semanticSnapshot, options.registry);
     });
+    const nextPageFingerprint = JSON.stringify(page);
+    if (nextPageFingerprint !== pageFingerprint) {
+      pageRevision += 1;
+      pageFingerprint = nextPageFingerprint;
+    }
     options.onPageSnapshot?.(page);
     publish({ ...snapshot, page });
     return page;
@@ -251,6 +269,7 @@ export function createFlowController(
 
   const beginRun = (): number => {
     generation += 1;
+    continuationRequested = false;
     clearContinuation();
     return generation;
   };
@@ -318,6 +337,41 @@ export function createFlowController(
     };
   };
 
+  const reasoningKeyFor = (
+    request: ReasonRequest,
+    recentActionTimestamps: number[],
+  ): string =>
+    JSON.stringify({
+      pageRevision,
+      request,
+      recentActionTimestamps,
+    });
+
+  const reasonOnce = (
+    request: ReasonRequest,
+    key: string,
+  ): Promise<GuideAction> => {
+    if (inFlightReasoning?.key === key) {
+      return inFlightReasoning.promise;
+    }
+
+    const promise = options.reasoner.reason(request);
+    inFlightReasoning = { key, promise };
+    promise.then(
+      () => {
+        if (inFlightReasoning?.promise === promise) {
+          inFlightReasoning = undefined;
+        }
+      },
+      () => {
+        if (inFlightReasoning?.promise === promise) {
+          inFlightReasoning = undefined;
+        }
+      },
+    );
+    return promise;
+  };
+
   const reasonAndGuide = async (
     transcript: SpeechToTextResult,
     runGeneration: number,
@@ -338,19 +392,33 @@ export function createFlowController(
     setPhase('thinking');
     try {
       const page = refresh();
+      const session = options.session.getState();
+      const request = buildReasonRequest({
+        userUtterance: transcript.transcript,
+        language: transcript.language,
+        session,
+        page,
+      });
+      const reasoningKey = reasoningKeyFor(
+        request,
+        session.recentActions.map((action) => action.timestamp),
+      );
+      if (
+        lastReasoning?.key === reasoningKey &&
+        lastReasoning.expiresAt > now()
+      ) {
+        return lastReasoning.result;
+      }
       const action = await measure('reasoning', () =>
-        options.reasoner.reason(
-          buildReasonRequest({
-            userUtterance: transcript.transcript,
-            language: transcript.language,
-            session: options.session.getState(),
-            page,
-          }),
-        ));
+        reasonOnce(request, reasoningKey),
+      );
       if (!isCurrent(runGeneration)) {
         return { status: 'cancelled' };
       }
 
+      if (action.workflow) {
+        options.session.setWorkflow(action.workflow);
+      }
       publish({ ...snapshot, lastAction: action });
       if (action.action === 'guide') {
         setPhase('guiding');
@@ -360,7 +428,19 @@ export function createFlowController(
         return { status: 'cancelled' };
       }
 
-      return guideResultToFlowResult(transcript, action, guideResult);
+      const flowResult = guideResultToFlowResult(
+        transcript,
+        action,
+        guideResult,
+      );
+      if (flowResult.status === 'completed') {
+        lastReasoning = {
+          key: reasoningKey,
+          result: flowResult,
+          expiresAt: now() + REASONING_DEDUPE_WINDOW_MS,
+        };
+      }
+      return flowResult;
     } catch (error) {
       if (!isCurrent(runGeneration)) {
         return { status: 'cancelled' };
@@ -374,19 +454,43 @@ export function createFlowController(
       return;
     }
 
-    const runGeneration = beginRun();
-    await measure('page-settle', waitForPageSettled);
-    if (!isCurrent(runGeneration) || !snapshot.lastTranscript) {
+    if (continuationInFlight) {
+      continuationRequested = true;
       return;
     }
 
-    await reasonAndGuide(snapshot.lastTranscript, runGeneration);
+    continuationRequested = false;
+    continuationInFlight = true;
+    const runGeneration = beginRun();
+    try {
+      await measure('page-settle', waitForPageSettled);
+      if (!isCurrent(runGeneration) || !snapshot.lastTranscript) {
+        return;
+      }
+
+      await reasonAndGuide(snapshot.lastTranscript, runGeneration);
+    } finally {
+      continuationInFlight = false;
+      if (
+        continuationRequested &&
+        started &&
+        snapshot.phase !== 'success' &&
+        snapshot.lastTranscript
+      ) {
+        clearContinuation();
+        continuationTimer = setTimeout(() => {
+          continuationTimer = undefined;
+          void continueAfterPageChange();
+        }, 0);
+      }
+    }
   };
 
   const scheduleContinuation = () => {
     if (!started || snapshot.phase === 'success' || !snapshot.lastTranscript) {
       return;
     }
+    continuationRequested = true;
     clearContinuation();
     continuationTimer = setTimeout(() => {
       continuationTimer = undefined;
