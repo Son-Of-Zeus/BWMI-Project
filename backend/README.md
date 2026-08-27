@@ -33,10 +33,7 @@ Permanent provider rejections are returned without retrying. The Groq adapter us
 structured output for `openai/gpt-oss-120b`; the model must include a generic
 intent-readiness assessment before it can return `guide`. If that assessment
 reports missing or ambiguous conversational information, the adapter safely
-returns `clarify`. If the model misclassifies visible page-entry fields such as
-UAN or password as missing information, the adapter recovers to the earliest
-matching textbox and returns a manual `guide` action; it never receives or
-enters the value. Consequence-aware validation still remains a server-side
+returns `clarify`. Consequence-aware validation still remains a server-side
 safety gate. Groq response/error logs include an
 operation ID, readiness state, bounded requirement counts/names, response keys,
 target safety classification, and consequence/spoken-text lengths, but never the

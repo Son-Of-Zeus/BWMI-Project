@@ -10,7 +10,7 @@ It does not manipulate the browser.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint and bounded intent-readiness memory, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them. The backend keeps conversational readiness separate from routine page-entry work and recovers a safe textbox guide if a model incorrectly reports visible page fields as missing information. The flow coalesces repeated continuation triggers while a page transition or reasoning request is already in flight, and suppresses an identical completed request for a short debounce window.
+The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint and bounded intent-readiness memory, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them. The backend keeps conversational readiness separate from routine page-entry work and expects the model to guide the current textbox when the intent is clear. The flow coalesces repeated continuation triggers while a page transition or reasoning request is already in flight, and suppresses an identical completed request for a short debounce window.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -146,7 +146,7 @@ Prefer:
 
 For a page-entry textbox, prefer:
 
-> Click UAN. Enter it on the website yourself. Do not say it aloud. Say "I'm done" when finished.
+> Click the field and enter the value on the website. Do not say it aloud. Say "I'm done" when finished.
 
 Avoid:
 
