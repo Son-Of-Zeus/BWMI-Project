@@ -10,7 +10,7 @@ It does not manipulate the browser.
 
 ## Current Implementation
 
-The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint and bounded intent-readiness memory, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them. The flow coalesces repeated continuation triggers while a page transition or reasoning request is already in flight, and suppresses an identical completed request for a short debounce window.
+The extension implementation lives in `apps/extension/reasoning/reasoning.ts`. It builds a minimal provider-neutral request, carries an optional detected speech-language hint and bounded intent-readiness memory, strips timestamps and DOM references, posts to the configured reasoning endpoint, and validates strict `GuideAction` responses against the current semantic target IDs before returning them. The backend keeps conversational readiness separate from routine page-entry work and recovers a safe textbox guide if a model incorrectly reports visible page fields as missing information. The flow coalesces repeated continuation triggers while a page transition or reasoning request is already in flight, and suppresses an identical completed request for a short debounce window.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -61,10 +61,12 @@ Do not send:
 Use strict structured output. The Groq `openai/gpt-oss-120b` adapter requires
 all response fields in its provider schema; fields that do not apply are
 represented as `null`, then normalized back to this provider-neutral contract.
-Every model response also contains a generic readiness assessment. A response
-with missing or ambiguous information is converted to `clarify` before it can
-reach the guide controller. The live safety gate still requires a non-empty
-consequence for consequential targets.
+Every model response also contains a generic intent-readiness assessment. A
+response with missing or ambiguous conversational information is converted to
+`clarify` before it can reach the guide controller. Empty website fields do not
+make intent unready; the user completes them locally through a textbox guide.
+The live safety gate still requires a non-empty consequence for consequential
+targets.
 
 ```ts
 type GuideAction =
@@ -126,18 +128,25 @@ useful multi-sentence answer. This prevents a concise action message from
 artificially limiting a general explanation.
 
 `requiredInformation`, `knownInformation`, and `missingInformation` contain
-requirement names only, never submitted values. `hasValue`, browser validity,
+intent-level choices or facts only, never submitted values. UAN, password, OTP,
+amount, date, reason, and other website fields are page-entry actions and must
+not be listed merely because they are empty. `hasValue`, browser validity,
 prefilled values, and default selections do not prove that the user supplied or
-confirmed information. A `guide` response is valid only when readiness is
-`ready`; a `clarify` response must carry a focused question and the missing
-requirements. The extension retains this bounded assessment between voice
-turns so a multi-turn clarification does not forget earlier answers.
+confirmed conversational information. A `guide` response is valid only when
+intent readiness is `ready`; a `clarify` response must carry a focused question
+and the missing conversational requirements. The extension retains this
+bounded assessment between voice turns so a multi-turn clarification does not
+forget earlier answers.
 
 ## Instruction Style
 
 Prefer:
 
 > Online Services par click kariye.
+
+For a page-entry textbox, prefer:
+
+> Click UAN. Enter it on the website yourself. Do not say it aloud. Say "I'm done" when finished.
 
 Avoid:
 

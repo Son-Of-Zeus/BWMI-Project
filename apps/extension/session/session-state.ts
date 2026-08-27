@@ -30,8 +30,9 @@ export type PendingAction = {
 };
 
 /**
- * Bounded planning metadata. It contains requirement names/status only; never
- * store the user's actual values here.
+ * Bounded intent-planning metadata. It contains conversational requirement
+ * names/status only; page-entry progress remains local to the pending action
+ * and recent semantic actions. Never store the user's actual values here.
  */
 export type IntentReadiness = {
   intent?: string;

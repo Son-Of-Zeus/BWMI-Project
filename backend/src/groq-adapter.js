@@ -42,20 +42,25 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   `- workflow.clarifyingQuestion must be at most ${MAX_CLARIFYING_QUESTION_LENGTH} characters and action clarify must repeat it exactly.`,
   '- Set expectedUserAction to exactly one lowercase value: click, input, or select; never a sentence.',
   '- For an input target, tell the user to say “I\'m done” when they finish entering information.',
-  '- First determine the user\'s intent and make a complete prerequisite plan before choosing any guide target.',
-  '- requiredInformation must list every decision or fact needed to carry out that intent, including applicable visible fields, choices, quantities, dates, destinations, reasons, identity checks, consent, and confirmation.',
-  '- Do not invent requirements unrelated to the intent. If the intent is only navigation or explanation, requiredInformation may be empty.',
+  '- First determine the user\'s intent, then distinguish conversational prerequisites from page-entry requirements before choosing a target.',
+  '- Conversational prerequisites are choices or facts needed to disambiguate the path, such as withdraw versus status or which claim type the user wants.',
+  '- Page-entry requirements are values the user enters into the current website, including UAN, account number, password, OTP, Aadhaar, amount, dates, reasons, and bank details. They are page actions, not missing conversational information.',
+  '- Never ask the user to speak, provide, or confirm a page-entry value to the assistant. Never repeat or store such a value.',
+  '- requiredInformation, knownInformation, and missingInformation contain conversational choices or facts only; never list routine website fields there merely because they are empty.',
+  '- Do not invent conversational requirements unrelated to the intent. If the intent is clear, the workflow is ready for page guidance even when the website still has empty fields.',
   '- Keep workflow.intent as a short task category, not a transcript or a user-provided value.',
   '- knownInformation and missingInformation must contain requirement names/categories only, never the user\'s actual values.',
   '- Treat the prior session.workflow as tentative planning memory and update it with the current utterance, recent manual actions, pending action, and current page.',
-  '- Count information as known only when the user explicitly supplied or confirmed it, or when a recent manual action clearly completed that exact control. Do not infer it from intent wording, a browser default, a prefilled value, hasValue, validationState, or a disabled/enabled state.',
+  '- Count conversational information as known only when the user explicitly supplied or confirmed it. Do not infer it from intent wording, a browser default, a prefilled value, hasValue, validationState, or a disabled/enabled state.',
   '- A visible select option or default is not user confirmation. A text input with hasValue is not proof that the user intentionally entered or reviewed it.',
-  '- For a form task, a value spoken by the user describes what to enter; it does not prove that the corresponding control has been completed. Require the matching recent manual action, and require the explicit input-completion phrase before advancing from a text input.',
+  '- For a form task, guide the current page control and let the user enter the value locally. A value spoken by the user does not prove that the corresponding control has been completed. Require the matching recent manual action, and require the explicit input-completion phrase before advancing from a text input.',
+  '- Once intent is clear, if the current page exposes an enabled relevant textbox, guide the earliest such textbox before a later button or submission control. Do not ask for the textbox value in voice.',
+  '- For a login page, guide the identifier textbox first, then the password textbox after the identifier input is explicitly completed, then guide the Login button for a manual click.',
   '- Before any final, send, submit, approve, consent, payment, transfer, or other consequential control, verify that every applicable prerequisite control has been manually completed or explicitly confirmed in the workflow and current session. Never jump from a verbal value directly to the final control.',
   '- If any required information is unknown, ambiguous, contradictory, or not explicitly confirmed, set workflow.readiness to needs_clarification, list it in missingInformation, write one focused clarifyingQuestion, set action to clarify, and set targetId, consequence, and expectedUserAction to null.',
-  '- When clarification is needed, ask the earliest blocking question first. Do not guide a form field, navigation control, review control, or submission control until the required information is known.',
+  '- When clarification is needed, ask the earliest blocking conversational question first. Do not guide a path-dependent control until that choice is known, but do guide page-entry textboxes once the path is clear.',
   '- For action clarify, spokenInstruction must exactly repeat workflow.clarifyingQuestion.',
-  '- Only set workflow.readiness to ready when missingInformation is empty. Only a ready workflow may return guide.',
+  '- Only set workflow.readiness to ready when conversational missingInformation is empty. Only a ready workflow may return guide; page-entry fields do not make the workflow conversationally unready.',
   '- For non-task responses such as wait, explain, scroll, or success, use workflow.readiness not_applicable and leave missingInformation empty unless there is an active task plan.',
   '- For a general explanation, set targetId to null. Do not invent or force a target merely to satisfy the schema.',
   '- consequence is a hard safety requirement, not an optional stylistic field.',
@@ -64,6 +69,8 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   '- If you cannot state the consequence accurately, return clarify or wait instead of returning guide.',
   '- Never return guide for a consequential target without consequence, even if the user asks for a quick next step.',
   '- Never treat hasValue or validationState as the user\'s completion signal for a text input. When session.pendingAction.type is input, wait for an explicit phrase such as "I\'m done", "finished", or "I have entered it" before advancing; explanation questions may be answered without advancing.',
+  '- For an input-guide instruction, tell the user to enter the value on the website themselves, not to say it aloud, and to say "I\'m done" when finished.',
+  '- If the user asks where or how to enter something and a matching enabled textbox is visible, return guide for that textbox rather than a targetless explanation.',
   '- On a changed page, continue from the current semantic page and pending workflow. Do not restart at a global navigation item when a current-page target is available.',
   '- On a review page, guide the unchecked confirmation control first; once it is checked, guide the enabled final submission control instead of returning to global navigation.',
   '- When the current page indicates that the request was submitted or is complete, return success and do not guide another control.',
@@ -72,7 +79,7 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   'Before returning any response, perform this checklist silently:',
   '1. Identify the intent and enumerate the information required before execution.',
   '2. Compare each requirement with explicit user statements, prior workflow metadata, recent manual actions, and the live page.',
-  '3. If anything is missing or ambiguous, return clarify and do not return guide.',
+  '3. If a conversational choice or fact is missing or ambiguous, return clarify. Empty page-entry fields do not trigger clarification.',
   '4. If returning guide, find the exact targetId, read that element\'s safety.consequenceRequired value, and include a consequence when it is true.',
   '5. Include all workflow fields; do not rely on omitted optional fields.',
   `6. Apply the action-specific speech limits: explain up to ${MAX_EXPLANATION_LENGTH} characters; guide, clarify, success, consequence, and clarifyingQuestion up to ${MAX_GUIDANCE_INSTRUCTION_LENGTH} characters.`,
@@ -81,10 +88,12 @@ export const GUIDE_ACTION_SYSTEM_PROMPT = [
   '{"action":"clarify","targetId":null,"spokenInstruction":"Which option do you want?","consequence":null,"expectedUserAction":null,"language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["option"],"knownInformation":[],"missingInformation":["option"],"readiness":"needs_clarification","clarifyingQuestion":"Which option do you want?"}}',
   'Valid targetless explanation shape:',
   '{"action":"explain","targetId":null,"spokenInstruction":"These options differ by eligibility and outcome.","consequence":null,"expectedUserAction":null,"language":"en-IN","workflow":{"intent":null,"requiredInformation":[],"knownInformation":[],"missingInformation":[],"readiness":"not_applicable","clarifyingQuestion":null}}',
+  'Valid page-entry input guide shape:',
+  '{"action":"guide","targetId":"<UAN textbox from elements>","spokenInstruction":"Click UAN and enter it on the website yourself. Do not say it aloud. Say \\"I\'m done\\" when finished.","consequence":null,"expectedUserAction":"input","language":"en-IN","workflow":{"intent":"PF withdrawal","requiredInformation":[],"knownInformation":[],"missingInformation":[],"readiness":"ready","clarifyingQuestion":null}}',
   'Valid consequential guide shape:',
   '{"action":"guide","targetId":"<target from elements>","spokenInstruction":"Review the details, then click the button yourself.","consequence":"This will submit your request.","expectedUserAction":"click","language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["request details"],"knownInformation":["request details"],"missingInformation":[],"readiness":"ready","clarifyingQuestion":null}}',
-  'Invalid shape — never guide while information is missing:',
-  '{"action":"guide","targetId":"<target from elements>","spokenInstruction":"Click Submit.","consequence":"This will submit your request.","expectedUserAction":"click","language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["amount"],"knownInformation":[],"missingInformation":["amount"],"readiness":"needs_clarification","clarifyingQuestion":"How much do you need?"}}',
+  'Invalid shape — never guide while a conversational choice is missing:',
+  '{"action":"guide","targetId":"<target from elements>","spokenInstruction":"Click Submit.","consequence":"This will submit your request.","expectedUserAction":"click","language":"en-IN","workflow":{"intent":"the user task","requiredInformation":["claim type"],"knownInformation":[],"missingInformation":["claim type"],"readiness":"needs_clarification","clarifyingQuestion":"Which claim type do you want?"}}',
 ].join('\n');
 
 export const GROQ_GUIDE_ACTION_RESPONSE_FORMAT = {
@@ -560,6 +569,207 @@ function normalizeModelWorkflow(value) {
   );
 }
 
+const PAGE_ENTRY_REQUIREMENT_GROUPS = [
+  {
+    name: 'identifier',
+    pattern: /\b(?:uan|universal account number|account number|identifier|username)\b/i,
+  },
+  {
+    name: 'credential',
+    pattern: /\b(?:password|passcode|pin|credential|credentials)\b/i,
+  },
+  {
+    name: 'otp',
+    pattern: /\b(?:otp|one[- ]time password|verification code)\b/i,
+  },
+  {
+    name: 'identity',
+    pattern: /\b(?:aadhaar|aadhar|identity|kyc)\b/i,
+  },
+  {
+    name: 'amount',
+    pattern: /\b(?:amount|sum|quantity)\b/i,
+  },
+  {
+    name: 'date',
+    pattern: /\b(?:date|dob|date of birth)\b/i,
+  },
+  {
+    name: 'reason',
+    pattern: /\b(?:reason|purpose)\b/i,
+  },
+  {
+    name: 'banking',
+    pattern: /\b(?:bank|ifsc)\b/i,
+  },
+  {
+    name: 'contact',
+    pattern: /\b(?:phone|mobile|email)\b/i,
+  },
+  {
+    name: 'address',
+    pattern: /\baddress\b/i,
+  },
+];
+
+function normalizedRequirement(value) {
+  return value.replace(/[^a-z0-9]+/gi, ' ').trim().toLowerCase();
+}
+
+function pageEntryRequirementMatches(requirement, element) {
+  if (
+    element.role !== 'textbox' ||
+    element.visible !== true ||
+    element.disabled === true
+  ) {
+    return false;
+  }
+
+  const requirementText = normalizedRequirement(requirement);
+  const labelText = normalizedRequirement(element.label);
+  if (!requirementText || !labelText) {
+    return false;
+  }
+
+  if (
+    labelText === requirementText ||
+    labelText.includes(requirementText) ||
+    requirementText.includes(labelText)
+  ) {
+    return true;
+  }
+
+  const requirementGroup = PAGE_ENTRY_REQUIREMENT_GROUPS.find(({ pattern }) =>
+    pattern.test(requirementText),
+  );
+  const labelGroup = PAGE_ENTRY_REQUIREMENT_GROUPS.find(({ pattern }) =>
+    pattern.test(labelText),
+  );
+  return Boolean(requirementGroup && requirementGroup.name === labelGroup?.name);
+}
+
+function pageEntryTargetFor(workflow, elements) {
+  if (workflow.missingInformation.length === 0) {
+    return undefined;
+  }
+
+  const inputTargets = elements.filter(
+    (element) =>
+      element.role === 'textbox' &&
+      element.visible === true &&
+      element.disabled !== true,
+  );
+  if (inputTargets.length === 0) {
+    return undefined;
+  }
+
+  const allMissingRequirementsArePageEntry = workflow.missingInformation.every(
+    (requirement) =>
+      inputTargets.some((element) =>
+        pageEntryRequirementMatches(requirement, element),
+      ),
+  );
+  if (!allMissingRequirementsArePageEntry) {
+    return undefined;
+  }
+
+  return inputTargets.find((element) =>
+    workflow.missingInformation.some((requirement) =>
+      pageEntryRequirementMatches(requirement, element),
+    ),
+  );
+}
+
+function isPageEntryGuidanceQuestion(value) {
+  return /\b(?:where|put|place|enter|type|fill|input)\b/i.test(value);
+}
+
+function pageEntryRequirementOnPage(requirement, elements) {
+  return elements.some((element) =>
+    pageEntryRequirementMatches(requirement, element),
+  );
+}
+
+function readyWorkflowForPageEntry(workflow, elements) {
+  return {
+    ...(workflow.intent ? { intent: workflow.intent } : {}),
+    requiredInformation: workflow.requiredInformation.filter(
+      (requirement) => !pageEntryRequirementOnPage(requirement, elements),
+    ),
+    knownInformation: workflow.knownInformation.filter(
+      (requirement) => !pageEntryRequirementOnPage(requirement, elements),
+    ),
+    missingInformation: [],
+    readiness: 'ready',
+  };
+}
+
+function isHindiLanguage(language) {
+  return /^(?:hi|hinglish)/i.test(language);
+}
+
+function boundedTargetLabel(label) {
+  const normalized = label.replace(/\s+/g, ' ').trim();
+  return normalized.length <= 80
+    ? normalized
+    : `${normalized.slice(0, 79).trimEnd()}…`;
+}
+
+function pageEntryInstruction(target, language) {
+  const label = boundedTargetLabel(target.label);
+  if (isHindiLanguage(language)) {
+    return `${label} par click karke website par khud darj kariye. Value bolkar mat batayiye. Kaam ho jaaye to "I'm done" kahiye.`;
+  }
+
+  return `Click ${label}. Enter it on the website yourself. Do not say it aloud. Say "I'm done" when finished.`;
+}
+
+function pageEntryConsequence(target, language) {
+  const consequenceType = classifyConsequence(target.label);
+  if (!consequenceType) {
+    return undefined;
+  }
+
+  if (isHindiLanguage(language)) {
+    const hindiConsequences = {
+      submission: 'Isse aapki request submit ho jayegi.',
+      consent: 'Isse aapki sahmati record ho jayegi.',
+      identity: 'Isse aapki pehchaan verify hogi.',
+      'personal-data': 'Isse aapki personal information update hogi.',
+      financial: 'Isse aapki financial request aage badhegi.',
+      credentials: 'Isse sign-in ka credential step aage badhega.',
+    };
+    return hindiConsequences[consequenceType];
+  }
+
+  const englishConsequences = {
+    submission: 'This will submit your request.',
+    consent: 'This will record your consent.',
+    identity: 'This will verify your identity.',
+    'personal-data': 'This will update your personal information.',
+    financial: 'This will move your financial request forward.',
+    credentials: 'This will continue the credential step.',
+  };
+  return englishConsequences[consequenceType];
+}
+
+function pageEntryGuideAction(target, workflow, request, value, elements) {
+  const language =
+    typeof value?.language === 'string' && value.language.trim()
+      ? value.language
+      : request.userLanguage ?? 'en-IN';
+  const consequence = pageEntryConsequence(target, language);
+  return {
+    action: 'guide',
+    targetId: target.id,
+    spokenInstruction: pageEntryInstruction(target, language),
+    ...(consequence ? { consequence } : {}),
+    expectedUserAction: 'input',
+    language,
+    workflow: readyWorkflowForPageEntry(workflow, elements),
+  };
+}
+
 function normalizeReadinessAction(value, elements, request) {
   if (
     typeof value !== 'object' ||
@@ -574,6 +784,23 @@ function normalizeReadinessAction(value, elements, request) {
   const normalizedAction = normalizeGuideAction(value, elements, workflow);
 
   if (workflow.readiness === 'needs_clarification') {
+    const pageEntryTarget = pageEntryTargetFor(workflow, elements);
+    const canRecoverToPageEntryGuide =
+      pageEntryTarget &&
+      (value.action === 'clarify' ||
+        value.action === 'guide' ||
+        (value.action === 'explain' &&
+          isPageEntryGuidanceQuestion(request.userUtterance)));
+    if (canRecoverToPageEntryGuide) {
+      return pageEntryGuideAction(
+        pageEntryTarget,
+        workflow,
+        request,
+        value,
+        elements,
+      );
+    }
+
     const language =
       typeof normalizedAction?.language === 'string'
         ? normalizedAction.language

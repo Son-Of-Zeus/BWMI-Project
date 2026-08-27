@@ -151,8 +151,9 @@ function validateSemanticElement(value, index) {
 /**
  * Validate the model's generic intent/readiness assessment.
  *
- * This metadata contains requirement names and status only. It must never be
- * used as a transport for the user's actual form values.
+ * This metadata contains intent-level requirement names and status only. Page
+ * entry fields are completed locally by the user and must not be represented
+ * as missing conversational information or used as a transport for values.
  */
 export function validateIntentReadiness(value, field = 'workflow') {
   const workflow = requireRecord(value, field);

@@ -15,7 +15,8 @@ immediately repeated requests. `backend/src/contracts.js` validates
 semantic-only requests, strict `GuideAction` responses, language hints,
 consequence text, generic intent-readiness metadata, and bounded speech
 payloads. Raw DOM references, disabled guide targets, unknown target IDs,
-missing-prerequisite guidance, and executable instruction text are rejected.
+missing conversational prerequisites, and executable instruction text are
+rejected. Empty page-entry fields are guided as manual textbox actions.
 
 Set `PROTOTYPE_MODE=true` to use deterministic offline adapters. The normal
 server requires `GROQ_API_KEY`, `GROQ_MODEL` is optional, and

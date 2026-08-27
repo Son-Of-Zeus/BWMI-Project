@@ -354,10 +354,13 @@ export type IntentReadiness = {
 ```
 
 Keep this schema small during the hackathon. The reasoning layer must assess
-required information before selecting a guide target. If information is
-missing or ambiguous, it returns `clarify`; `guide` is permitted only when the
-readiness assessment is `ready`. The requirement arrays contain names only,
-never user values.
+conversational prerequisites before selecting a guide target. If a choice or
+fact needed to disambiguate the path is missing or ambiguous, it returns
+`clarify`; `guide` is permitted only when that intent readiness is `ready`.
+Routine page-entry fields such as UAN, password, OTP, amount, or dates are
+manual page actions, not conversational prerequisites, and must not block
+guidance or be requested as voice values. The requirement arrays contain names
+only, never user values.
 
 Spoken text limits are action-specific: concise guide, clarification, success,
 and consequence text is limited to 240 characters, while a general
@@ -387,13 +390,13 @@ User presses the microphone and says:
 
 The transcript and semantic snapshot are sent to the reasoning API.
 
-Before selecting a target, the reasoning layer identifies the information and
-decisions needed for the user's intent. If the user has not supplied or
-confirmed them, the assistant asks a focused clarification question first;
-browser defaults and prefilled values are not treated as confirmation.
+The reasoning layer first checks whether the user's intent or a path-dependent
+choice is ambiguous. If the intent is clear, it guides the current page control;
+the user enters any UAN, password, OTP, or other form value directly on the
+website. Those values are never requested or repeated in voice.
 
-Once the intent is ready, the LLM selects the visible `Online Services` element
-or another appropriate target.
+Once the intent is ready, the LLM selects the visible `Online Services` element,
+the first applicable textbox, or another appropriate target.
 
 The extension:
 
