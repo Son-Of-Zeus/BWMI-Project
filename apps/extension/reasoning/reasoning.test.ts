@@ -237,6 +237,21 @@ describe('reasoning boundary', () => {
     expect(validateGuideAction({ action: 'wait' }, [])).toEqual({
       action: 'wait',
     });
+    expect(
+      validateGuideAction(
+        {
+          action: 'explain',
+          targetId: null,
+          spokenInstruction: 'These options differ by eligibility and outcome.',
+          language: 'en-IN',
+        },
+        [],
+      ),
+    ).toEqual({
+      action: 'explain',
+      spokenInstruction: 'These options differ by eligibility and outcome.',
+      language: 'en-IN',
+    });
     expect(() =>
       validateGuideAction(
         {

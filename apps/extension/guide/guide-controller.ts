@@ -370,8 +370,25 @@ export function createGuideController(
         return { status: 'completed', action: action.action };
       }
 
+      if (action.action === 'explain' && !action.targetId) {
+        const speechResult = await runSpeech(
+          action.spokenInstruction,
+          action.language,
+          runGeneration,
+        );
+        if (speechResult) {
+          return speechResult;
+        }
+        finishExplanation();
+        return { status: 'completed', action: action.action };
+      }
+
+      const targetId = action.targetId;
+      if (!targetId) {
+        return finishBlocked('This guidance action requires a live target.');
+      }
       const prepared = await prepareTarget(
-        action.targetId,
+        targetId,
         runGeneration,
         action.action !== 'scroll',
       );
@@ -379,7 +396,7 @@ export function createGuideController(
         return { status: 'cancelled' };
       }
       if (prepared.status === 'stale-target') {
-        return staleTarget(action.targetId);
+        return staleTarget(targetId);
       }
 
       if (action.action === 'scroll') {

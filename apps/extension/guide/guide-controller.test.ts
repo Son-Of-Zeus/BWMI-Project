@@ -391,6 +391,23 @@ describe('guide controller', () => {
     expect(harness.overlay.clear).toHaveBeenCalled();
   });
 
+  it('speaks a general explanation without requiring a target', async () => {
+    const harness = createHarness();
+
+    const result = await harness.controller.run({
+      action: 'explain',
+      spokenInstruction: 'These options differ by eligibility and outcome.',
+      language: 'en-IN',
+    });
+
+    expect(result).toEqual({ status: 'completed', action: 'explain' });
+    expect(harness.speech.say).toHaveBeenCalledWith(
+      'These options differ by eligibility and outcome.',
+      'en-IN',
+    );
+    expect(harness.overlay.highlight).not.toHaveBeenCalled();
+  });
+
   it('cancels speech and pending guidance without allowing a late result to enter waiting', async () => {
     let resolveSpeech!: () => void;
     const harness = createHarness();

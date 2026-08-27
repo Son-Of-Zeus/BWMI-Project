@@ -258,7 +258,9 @@ The model does not:
 
 The extension validates every model response.
 
-If `targetId` does not exist in the current registry, the action is rejected.
+If an action supplies a `targetId`, it must exist in the current registry. A
+general `explain` action may omit `targetId`; target-specific explanations are
+still registry-validated.
 
 Consequential actions are never executed automatically.
 
@@ -319,7 +321,7 @@ export type GuideAction =
     }
   | {
       action: "explain";
-      targetId: string;
+      targetId?: string;
       spokenInstruction: string;
       language: string;
     }

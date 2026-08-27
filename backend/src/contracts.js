@@ -423,11 +423,16 @@ export function validateGuideAction(value, elements) {
       ['action', 'targetId', 'spokenInstruction', 'language', ...workflowFields],
       'GuideAction',
     );
-    const targetId = requireString(action.targetId, 'targetId', 80);
-    targetById(availableElements, targetId);
+    const targetId =
+      action.targetId === undefined || action.targetId === null
+        ? undefined
+        : requireString(action.targetId, 'targetId', 80);
+    if (targetId) {
+      targetById(availableElements, targetId);
+    }
     return {
       action: 'explain',
-      targetId,
+      ...(targetId ? { targetId } : {}),
       spokenInstruction: requireInstruction(action.spokenInstruction, 'spokenInstruction'),
       language: requireString(action.language, 'language', 24),
       ...(workflow ? { workflow } : {}),

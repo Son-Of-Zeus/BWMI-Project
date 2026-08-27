@@ -78,7 +78,7 @@ type GuideAction =
     }
   | {
       action: "explain";
-      targetId: string;
+      targetId?: string;
       spokenInstruction: string;
       language: string;
     }
@@ -114,6 +114,10 @@ type IntentReadiness = {
 
 Every `GuideAction` may carry `workflow?: IntentReadiness` as bounded planning
 metadata for the next voice turn.
+
+An `explain` action may omit `targetId` when answering a general page or task
+question. If it supplies a target, that target must still be present in the
+live registry and the guide controller will focus it before speaking.
 
 `requiredInformation`, `knownInformation`, and `missingInformation` contain
 requirement names only, never submitted values. `hasValue`, browser validity,

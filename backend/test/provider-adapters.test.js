@@ -39,6 +39,22 @@ const READY_WORKFLOW = {
   clarifyingQuestion: null,
 };
 
+const NOT_APPLICABLE_MODEL_WORKFLOW = {
+  intent: null,
+  requiredInformation: [],
+  knownInformation: [],
+  missingInformation: [],
+  readiness: 'not_applicable',
+  clarifyingQuestion: null,
+};
+
+const NOT_APPLICABLE_WORKFLOW = {
+  requiredInformation: [],
+  knownInformation: [],
+  missingInformation: [],
+  readiness: 'not_applicable',
+};
+
 test('Groq adapter sends a direct JSON reasoning request', async () => {
   let captured;
   const events = [];
@@ -340,6 +356,49 @@ test('Groq adapter converts a guide that is not workflow-ready into clarificatio
   assert.equal(responseEvent[1].workflowReadiness, 'needs_clarification');
   assert.equal(responseEvent[1].missingInformationCount, 1);
   assert.doesNotMatch(JSON.stringify(responseEvent), /What details should/);
+});
+
+test('Groq adapter accepts a targetless explanation for a general question', async () => {
+  const reasoner = createGroqReasoner({
+    baseUrl: 'https://api.groq.test/openai/v1',
+    model: 'openai/gpt-oss-120b',
+    apiKey: 'test-groq-key',
+    logger: () => undefined,
+    fetcher: async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  action: 'explain',
+                  targetId: null,
+                  spokenInstruction:
+                    'These options differ by eligibility and outcome.',
+                  consequence: null,
+                  expectedUserAction: null,
+                  language: 'en-IN',
+                  workflow: NOT_APPLICABLE_MODEL_WORKFLOW,
+                }),
+              },
+            },
+          ],
+        };
+      },
+    }),
+  });
+
+  await assert.doesNotReject(async () => {
+    const result = await reasoner.reason(createReasonRequest());
+    assert.deepEqual(result, {
+      action: 'explain',
+      spokenInstruction: 'These options differ by eligibility and outcome.',
+      language: 'en-IN',
+      workflow: NOT_APPLICABLE_WORKFLOW,
+    });
+  });
 });
 
 test('Groq adapter retries transient transport failures', async () => {

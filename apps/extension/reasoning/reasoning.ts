@@ -48,7 +48,7 @@ export type GuideAction =
     } & WorkflowAware)
   | ({
       action: 'explain';
-      targetId: string;
+      targetId?: string;
       spokenInstruction: string;
       language: string;
     } & WorkflowAware)
@@ -387,7 +387,7 @@ export function validateGuideAction(
       }, targetMetadata);
     }
 
-    case 'explain':
+    case 'explain': {
       requireAllowedKeys(value, [
         'action',
         'targetId',
@@ -395,13 +395,18 @@ export function validateGuideAction(
         'language',
         'workflow',
       ]);
+      const targetId =
+        value.targetId === undefined || value.targetId === null
+          ? undefined
+          : requireTarget(value.targetId, availableTargets);
       return enforceTargetSafety({
         action,
-        targetId: requireTarget(value.targetId, availableTargets),
+        ...(targetId ? { targetId } : {}),
         spokenInstruction: requireSpokenInstruction(value.spokenInstruction),
         language: requireLanguage(value.language),
         ...(workflow ? { workflow } : {}),
       }, targetMetadata);
+    }
 
     case 'scroll':
       requireAllowedKeys(value, ['action', 'targetId', 'workflow']);

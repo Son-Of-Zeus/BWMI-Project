@@ -135,7 +135,9 @@ Output must match the strict `GuideAction` schema and include the generic
 `guide` is accepted only when `workflow.readiness` is `ready` and
 `missingInformation` is empty. Requirement arrays contain names/categories,
 not user values. The extension retains this bounded status between voice turns
-so the model can continue a multi-turn clarification safely.
+so the model can continue a multi-turn clarification safely. `explain` may be
+target-specific or targetless: a supplied `targetId` is validated, while a
+general page/task explanation does not need to invent a UI target.
 
 ## `/speech/transcribe`
 
