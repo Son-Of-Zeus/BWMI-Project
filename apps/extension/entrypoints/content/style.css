@@ -32,38 +32,29 @@
 }
 
 .companion-surface {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 2147483647;
-  display: flex;
-  align-items: center;
-  width: 220px;
-  min-height: 54px;
-  gap: 5px;
-  padding: 0;
-  border: 0;
+  position: static;
   color: #3f101a;
-  background: transparent;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
-  pointer-events: auto;
-  transition: left 220ms ease, top 220ms ease, transform 180ms ease,
-    box-shadow 180ms ease;
+  pointer-events: none;
 }
 
 .companion-button {
-  display: grid;
-  flex: 0 0 auto;
-  width: 42px;
-  height: 50px;
+  position: fixed;
+  z-index: 2147483647;
+  display: block;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  place-items: center;
   border: 0;
   background: transparent;
-  filter: drop-shadow(0 5px 7px rgba(94, 10, 30, 0.32));
+  filter: drop-shadow(0 7px 12px rgba(94, 10, 30, 0.3));
   cursor: pointer;
-  transition: transform 160ms ease, filter 160ms ease;
+  pointer-events: auto;
+  will-change: left, top, transform;
+  transition: left 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 180ms ease, filter 180ms ease;
 }
 
 .companion-button:hover {
@@ -94,8 +85,11 @@
 }
 
 .companion-panel {
-  min-width: 0;
-  flex: 1 1 auto;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483647;
+  width: 204px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -107,32 +101,12 @@
   box-shadow: 0 10px 28px rgba(94, 10, 30, 0.16),
     0 2px 6px rgba(94, 10, 30, 0.08);
   backdrop-filter: blur(16px);
-}
-
-.companion-surface--target-left {
-  flex-direction: row-reverse;
+  pointer-events: auto;
 }
 
 .companion-surface--target-left .companion-cursor {
   --companion-cursor-direction: -1;
-}
-
-.companion-surface--thinking.companion-surface--docked .companion-button {
-  position: absolute;
-  left: 7px;
-  top: 2px;
-  z-index: 1;
-  transform: scale(0.76);
-  filter: drop-shadow(0 3px 5px rgba(94, 10, 30, 0.28));
-}
-
-.companion-surface--thinking.companion-surface--docked .companion-button:hover {
-  transform: scale(0.79);
-}
-
-.companion-surface--thinking.companion-surface--docked .companion-panel {
-  width: 100%;
-  padding-left: 48px;
+  left: 10px;
 }
 
 .companion-reset:hover {
@@ -202,11 +176,15 @@
 .companion-surface--thinking .companion-cursor,
 .companion-surface--guiding .companion-cursor,
 .companion-surface--speaking .companion-cursor {
-  animation: companion-pulse 1.6s ease-in-out infinite;
+  animation: companion-cursor-pulse 1.8s ease-in-out infinite;
 }
 
 .companion-cursor {
   --companion-cursor-direction: 1;
+  position: absolute;
+  left: 1px;
+  top: 0;
+  z-index: 1;
   width: 34px;
   height: 42px;
   overflow: visible;
@@ -307,11 +285,12 @@
   font-variant-numeric: tabular-nums;
 }
 
-.companion-surface[data-companion-latency='slow'] {
+.companion-surface[data-companion-latency='slow'] .companion-button,
+.companion-surface[data-companion-latency='slow'] .companion-panel {
   filter: drop-shadow(0 0 7px rgba(197, 22, 54, 0.3));
 }
 
-@keyframes companion-pulse {
+@keyframes companion-cursor-pulse {
   0%,
   100% {
     transform: scaleX(var(--companion-cursor-direction)) scale(0.92);

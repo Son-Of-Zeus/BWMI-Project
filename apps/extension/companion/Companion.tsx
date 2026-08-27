@@ -1,8 +1,10 @@
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import {
   COMPANION_STATE_LABELS,
+  getDockedCompanionPosition,
   getCompanionPosition,
   type CompanionUiStore,
+  type CompanionViewport,
 } from './companion-ui';
 import type { CompanionState } from '../session/session-state';
 import { LATENCY_STAGE_LABELS } from '../runtime/latency';
@@ -43,6 +45,25 @@ type CompanionProps = {
   store: CompanionUiStore;
 };
 
+function getViewport(): CompanionViewport {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+function useViewport(): CompanionViewport {
+  const [viewport, setViewport] = useState(getViewport);
+
+  useEffect(() => {
+    const handleResize = () => setViewport(getViewport());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return viewport;
+}
+
 export default function Companion({ store }: CompanionProps) {
   const snapshot = useSyncExternalStore(
     store.subscribe,
@@ -58,26 +79,19 @@ export default function Companion({ store }: CompanionProps) {
     (total, metric) => total + metric.durationMs,
     0,
   );
-  const viewport = {
-    width: window.innerWidth,
-    height: window.innerHeight,
-  };
+  const viewport = useViewport();
   const position = snapshot.targetRect
     ? getCompanionPosition(snapshot.targetRect, viewport)
-    : undefined;
+    : getDockedCompanionPosition(viewport);
   const targetSide = snapshot.targetRect && position
     ? position.left >= snapshot.targetRect.right
       ? 'right'
       : 'left'
     : undefined;
-  const style = position
-    ? {
-        left: `${position.left}px`,
-        top: `${position.top}px`,
-        right: 'auto',
-        bottom: 'auto',
-      }
-    : undefined;
+  const pointerStyle = {
+    left: `${position.left}px`,
+    top: `${position.top}px`,
+  };
 
   return (
     <section
@@ -94,7 +108,6 @@ export default function Companion({ store }: CompanionProps) {
       data-companion-state={snapshot.state}
       data-companion-busy={isBusy}
       data-companion-latency={snapshot.latencyNotice ? 'slow' : 'normal'}
-      style={style}
     >
       <button
         className={`companion-button${isListening ? ' companion-button--listening' : ''}`}
@@ -103,6 +116,7 @@ export default function Companion({ store }: CompanionProps) {
         aria-describedby={COMPANION_STATUS_ID}
         aria-pressed={isListening}
         onClick={() => store.toggleListening()}
+        style={pointerStyle}
       >
         <svg
           className="companion-cursor"

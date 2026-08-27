@@ -9,19 +9,19 @@ The companion is not the mouse pointer and must never replace the system cursor.
 ## Current Implementation
 
 The extension implementation lives in `apps/extension/companion/`.
-`Companion.tsx` renders the eight required states as a red cursor with a compact
-attached status bubble, reset control, and expandable latency breakdown. The
-cursor moves beside the highlighted target and flips horizontally when it must
-sit on the target's left, keeping its tip closest to the control. During
-transcription and reasoning, when there is no live target yet, the cursor docks
-inside the status rectangle. Once a guide target is ready, it detaches and
-moves beside that element. The external store retains labeled-region, busy,
+`Companion.tsx` renders the eight required states as a red overlay cursor plus
+a compact docked status panel with reset control and expandable latency
+breakdown. The panel remains fixed at the viewport edge during guidance; only
+the cursor moves beside the highlighted target. It
+uses explicit `left`/`top` coordinates in both its docked and target states so
+the browser can interpolate one continuous, eased path, and flips horizontally
+when it must sit on the target's left. The external store retains labeled-region, busy,
 live-status,
 retry, follow-up, demo-reset, and slow-work semantics. `companion-ui.ts`
 provides fixed-position, target-aligned focus-mask and red highlight layers
 plus guide-controller adapters. Overlay layers use `pointer-events: none`, and
-position/motion helpers clamp the wider card to the viewport, use calm
-transition timing, and respect reduced motion.
+position/motion helpers clamp the cursor to the viewport, use calm motion,
+and respect reduced motion.
 
 Run the focused tests from `apps/extension/` with:
 
@@ -46,7 +46,7 @@ error
 
 Recommended MVP form:
 
-- red cursor with a compact attached status bubble
+- red overlay cursor with a separately docked status panel
 - calm scale or glow changes
 - subtle directional motion
 - no character animation dependency

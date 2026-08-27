@@ -29,7 +29,7 @@ export type GuideSpeech = {
   cancel(): void;
 };
 
-export const DEFAULT_COMPANION_MOVE_DURATION_MS = 220;
+export const DEFAULT_COMPANION_MOVE_DURATION_MS = 520;
 
 export type GuideControllerOptions = {
   document?: Document;

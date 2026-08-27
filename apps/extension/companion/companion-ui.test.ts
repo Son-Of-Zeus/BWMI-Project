@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COMPANION_STATE_LABELS,
   createCompanionUiStore,
+  getDockedCompanionPosition,
   getCompanionPosition,
 } from './companion-ui';
 
@@ -30,14 +31,14 @@ describe('companion UI', () => {
         width: 1200,
         height: 800,
       }),
-    ).toEqual({ left: 308, top: 98 });
+    ).toEqual({ left: 312, top: 108 });
 
     expect(
       getCompanionPosition(rect(100, 160, 1080, 1180), {
         width: 1200,
         height: 800,
       }),
-    ).toEqual({ left: 852, top: 98 });
+    ).toEqual({ left: 1024, top: 108 });
   });
 
   it('clamps the companion inside the viewport edges', () => {
@@ -46,7 +47,16 @@ describe('companion UI', () => {
         width: 320,
         height: 240,
       }),
-    ).toEqual({ left: 16, top: 16 });
+    ).toEqual({ left: 14, top: 14 });
+  });
+
+  it('uses explicit dock coordinates so movement to a target can interpolate', () => {
+    expect(
+      getDockedCompanionPosition({
+        width: 1200,
+        height: 800,
+      }),
+    ).toEqual({ left: 920, top: 732 });
   });
 
   it('publishes state and target changes through the external store', () => {

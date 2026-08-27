@@ -71,18 +71,18 @@ describe('Companion accessibility', () => {
     store.destroy();
   });
 
-  it('flips the red cursor so its tip stays nearest a left-side target', async () => {
+  it('moves only the cursor and flips its tip beside a right-edge target', async () => {
     const host = document.createElement('div');
     document.body.append(host);
     const store = createCompanionUiStore(host);
     store.setTarget({
       top: 100,
       bottom: 140,
-      left: 760,
-      right: 790,
+      left: 980,
+      right: 1010,
       width: 30,
       height: 40,
-      x: 760,
+      x: 980,
       y: 100,
       toJSON: () => ({}),
     } as DOMRect);
@@ -94,12 +94,20 @@ describe('Companion accessibility', () => {
       root.render(<Companion store={store} />);
     });
 
-    expect(host.querySelector('[role="region"]')?.className).toContain(
+    const surface = host.querySelector('[role="region"]') as HTMLElement;
+    const pointer = host.querySelector('.companion-button') as HTMLButtonElement;
+    const panel = host.querySelector('.companion-panel') as HTMLElement;
+    expect(surface.className).toContain(
       'companion-surface--target-left',
     );
-    expect(host.querySelector('[role="region"]')?.className).not.toContain(
+    expect(surface.className).not.toContain(
       'companion-surface--docked',
     );
+    expect(surface.getAttribute('style')).toBeNull();
+    expect(pointer.style.left).not.toBe('');
+    expect(pointer.style.top).not.toBe('');
+    expect(panel.getAttribute('style')).toBeNull();
+    expect(pointer.querySelector('.companion-orb')).toBeNull();
 
     root.unmount();
     store.destroy();

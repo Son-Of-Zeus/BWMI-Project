@@ -23,6 +23,13 @@ export type CompanionDimensions = {
   targetGap: number;
 };
 
+export type CompanionDockDimensions = {
+  panelWidth: number;
+  panelRight: number;
+  panelBottom: number;
+  pointerGap: number;
+};
+
 export type CompanionPosition = {
   left: number;
   top: number;
@@ -43,10 +50,17 @@ export type CompanionUiStore = GuideOverlay &
   };
 
 export const DEFAULT_COMPANION_DIMENSIONS: CompanionDimensions = {
-  width: 220,
-  height: 64,
-  edgePadding: 16,
-  targetGap: 8,
+  width: 44,
+  height: 44,
+  edgePadding: 14,
+  targetGap: 12,
+};
+
+export const DEFAULT_COMPANION_DOCK_DIMENSIONS: CompanionDockDimensions = {
+  panelWidth: 204,
+  panelRight: 24,
+  panelBottom: 24,
+  pointerGap: 8,
 };
 
 export const COMPANION_STATE_LABELS: Record<CompanionState, string> = {
@@ -89,6 +103,35 @@ export function getCompanionPosition(
   return {
     left: Math.round(left),
     top: Math.round(top),
+  };
+}
+
+export function getDockedCompanionPosition(
+  viewport: CompanionViewport,
+  dimensions: CompanionDimensions = DEFAULT_COMPANION_DIMENSIONS,
+  dock: CompanionDockDimensions = DEFAULT_COMPANION_DOCK_DIMENSIONS,
+): CompanionPosition {
+  return {
+    left: Math.round(
+      clamp(
+        viewport.width -
+          dock.panelRight -
+          dock.panelWidth -
+          dock.pointerGap -
+          dimensions.width,
+        dimensions.edgePadding,
+        viewport.width - dimensions.width - dimensions.edgePadding,
+      ),
+    ),
+    top: Math.round(
+      clamp(
+        viewport.height -
+          dock.panelBottom -
+          dimensions.height,
+        dimensions.edgePadding,
+        viewport.height - dimensions.height - dimensions.edgePadding,
+      ),
+    ),
   };
 }
 

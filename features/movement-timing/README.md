@@ -9,7 +9,9 @@ guidance step.
 
 `apps/extension/guide/guide-controller.ts` waits for the companion and
 highlight transition to settle before starting speech. The default wait is
-220ms, matching the companion surface transition; reduced-motion preferences
+520ms, matching the cursor's eased travel duration so it settles before
+speech begins;
+reduced-motion preferences
 bypass the delay. The wait is injectable for deterministic tests and is
 cancellation-aware, so a new request cannot speak after movement was canceled.
 
@@ -22,6 +24,7 @@ npm test -- --run guide/guide-controller.test.ts runtime/extension-runtime.test.
 ## Interaction Rules
 
 - target placement and highlighting happen before the wait begins
+- only the cursor moves; the status panel remains docked
 - speech starts only after movement settles
 - reduced-motion users do not receive an artificial animation delay
 - cancellation during movement clears guidance and prevents speech
