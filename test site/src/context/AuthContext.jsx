@@ -1,16 +1,21 @@
 import { createContext, useCallback, useMemo, useState } from 'react'
 
-const STORAGE_KEY = 'epf_session'
+const STORAGE_KEY = 'synthetic_demo_session'
 
-const MEMBER_DATA = {
+const SYNTHETIC_MEMBER_DATA = {
   UAN: '123456',
   name: 'Rajesh Kumar',
   balance: 450000,
   contribution: 125000,
 }
 
-const VALID_UAN = MEMBER_DATA.UAN
-const VALID_PASSWORD = 'demo@123'
+export const DEMO_CREDENTIALS = {
+  uan: SYNTHETIC_MEMBER_DATA.UAN,
+  password: 'demo@123',
+}
+
+const VALID_UAN = DEMO_CREDENTIALS.uan
+const VALID_PASSWORD = DEMO_CREDENTIALS.password
 
 export const AuthContext = createContext(null)
 
@@ -29,7 +34,7 @@ export function AuthProvider({ children }) {
   const login = useCallback((uan, password) => {
     if (uan === VALID_UAN && password === VALID_PASSWORD) {
       const nextSession = {
-        ...MEMBER_DATA,
+        ...SYNTHETIC_MEMBER_DATA,
         loggedInAt: new Date().toISOString(),
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession))

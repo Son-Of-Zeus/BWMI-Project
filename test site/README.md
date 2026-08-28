@@ -2,9 +2,10 @@
 
 ## Hosted voice companion demo
 
-The portal pages and routes remain unchanged. The root app mounts the existing
-voice companion in an isolated Shadow DOM so the jury can open the hosted site
-without installing a Chrome extension.
+The portal routes remain unchanged. Each page displays the shared prototype
+disclaimer and synthetic-data notice. The root app mounts the existing voice
+companion in an isolated Shadow DOM so the jury can open the hosted site without
+installing a Chrome extension.
 
 ### Local development
 

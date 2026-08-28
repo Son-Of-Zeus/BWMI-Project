@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import DashboardHeader from '../components/DashboardHeader'
+import PrototypeFooter from '../components/PrototypeFooter'
 import Sidebar from '../components/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 
@@ -30,16 +31,14 @@ export default function Dashboard() {
         <Sidebar activeItem="" onSelect={handleMenuSelect} />
 
         <main className="flex-1 p-6">
-          <h2 className="text-2xl font-semibold text-gray-800">Welcome, {member.name}</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">Welcome to the synthetic demo</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Select a service from the sidebar to get started.
+            Select a demo service from the sidebar to explore synthetic account workflows.
           </p>
         </main>
       </div>
 
-      <footer className="border-t border-gray-200 bg-white py-3 text-center text-xs text-gray-500">
-        © Employees&apos; Provident Fund Organisation, Government of India
-      </footer>
+      <PrototypeFooter />
     </div>
   )
 }

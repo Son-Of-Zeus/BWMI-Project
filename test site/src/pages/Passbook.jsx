@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardHeader from '../components/DashboardHeader'
+import PrototypeFooter from '../components/PrototypeFooter'
 import Sidebar from '../components/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 
-const MEMBER_DETAILS = {
+const SYNTHETIC_MEMBER_DETAILS = {
   dob: '15/03/1985',
   mobile: '9876543210',
 }
@@ -54,7 +55,7 @@ function generatePassbookEntries() {
         id: count,
         date,
         monthYear: `${MONTH_NAMES[month]} ${year}`,
-        particulars: 'Employer & Employee Contribution',
+        particulars: 'Synthetic employer & employee contribution',
         debit: 0,
         credit,
         balance,
@@ -106,7 +107,7 @@ export default function Passbook() {
   }
 
   const handleDownload = () => {
-    alert(`Passbook_${member.UAN}.pdf downloaded`)
+    alert(`Synthetic_Passbook_${member.UAN}.pdf downloaded`)
   }
 
   return (
@@ -129,8 +130,10 @@ export default function Passbook() {
               >
                 ← Back to Dashboard
               </button>
-              <h2 className="text-2xl font-semibold text-gray-800">Passbook</h2>
-              <p className="mt-1 text-sm text-gray-600">View your EPF passbook transactions</p>
+              <h2 className="text-2xl font-semibold text-gray-800">Passbook (Demo)</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                View synthetic provident-fund transaction examples.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -138,45 +141,60 @@ export default function Passbook() {
                 onClick={handlePrint}
                 className="rounded border border-[#1a3a6b] px-4 py-2 text-sm font-medium text-[#1a3a6b] transition hover:bg-[#1a3a6b] hover:text-white"
               >
-                Print Passbook
+                Print synthetic passbook
               </button>
               <button
                 type="button"
                 onClick={handleDownload}
                 className="rounded bg-[#1a3a6b] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#143055]"
               >
-                Download as PDF
+                Download synthetic PDF
               </button>
             </div>
           </div>
 
           <section className="mb-6 rounded border border-gray-200 bg-white p-5 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
-              Passbook Details
+              Synthetic passbook details
             </h3>
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Name</dt>
+                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Synthetic name
+                </dt>
                 <dd className="mt-1 font-medium text-gray-800">{member.name}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">UAN</dt>
+                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Synthetic UAN
+                </dt>
                 <dd className="mt-1 font-medium text-gray-800">{member.UAN}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">DOB</dt>
-                <dd className="mt-1 font-medium text-gray-800">{MEMBER_DETAILS.dob}</dd>
+                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Synthetic DOB
+                </dt>
+                <dd className="mt-1 font-medium text-gray-800">{SYNTHETIC_MEMBER_DETAILS.dob}</dd>
               </div>
               <div>
-                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Mobile</dt>
-                <dd className="mt-1 font-medium text-gray-800">{MEMBER_DETAILS.mobile}</dd>
+                <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Synthetic mobile
+                </dt>
+                <dd className="mt-1 font-medium text-gray-800">
+                  {SYNTHETIC_MEMBER_DETAILS.mobile}
+                </dd>
               </div>
             </dl>
           </section>
 
           <section className="rounded border border-gray-200 bg-white shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-200 px-5 py-4">
-              <h3 className="font-semibold text-gray-800">Transaction History</h3>
+              <div>
+                <h3 className="font-semibold text-gray-800">Synthetic transaction history</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  All rows and amounts below are synthetic demo data.
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 <label htmlFor="month-filter" className="text-sm text-gray-600">
                   Select Month/Year
@@ -202,9 +220,9 @@ export default function Passbook() {
                   <tr>
                     <th className="px-5 py-3 font-medium">Date</th>
                     <th className="px-5 py-3 font-medium">Particulars</th>
-                    <th className="px-5 py-3 font-medium text-right">Debit</th>
-                    <th className="px-5 py-3 font-medium text-right">Credit</th>
-                    <th className="px-5 py-3 font-medium text-right">Balance</th>
+                    <th className="px-5 py-3 font-medium text-right">Synthetic debit</th>
+                    <th className="px-5 py-3 font-medium text-right">Synthetic credit</th>
+                    <th className="px-5 py-3 font-medium text-right">Synthetic balance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -232,9 +250,7 @@ export default function Passbook() {
         </main>
       </div>
 
-      <footer className="border-t border-gray-200 bg-white py-3 text-center text-xs text-gray-500">
-        © Employees&apos; Provident Fund Organisation, Government of India
-      </footer>
+      <PrototypeFooter />
     </div>
   )
 }

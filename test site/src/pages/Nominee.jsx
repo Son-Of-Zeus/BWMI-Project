@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardHeader from '../components/DashboardHeader'
+import PrototypeFooter from '../components/PrototypeFooter'
 import Sidebar from '../components/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 
@@ -14,7 +15,7 @@ const INITIAL_NOMINEES = [
     percentage: 100,
     dob: '15/05/1992',
     address: '42, MG Road, Bengaluru, Karnataka - 560001',
-    status: 'Verified',
+    status: 'Synthetic example',
   },
 ]
 
@@ -34,11 +35,11 @@ function formatDisplayDate(isoDate) {
 }
 
 function StatusBadge({ status }) {
-  const isVerified = status === 'Verified'
+  const isExample = status === 'Synthetic example'
   return (
     <span
       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
-        isVerified ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+        isExample ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
       }`}
     >
       {status}
@@ -100,12 +101,12 @@ export default function Nominee() {
       percentage: Number(form.percentage),
       dob: formatDisplayDate(form.dob),
       address: form.address.trim(),
-      status: 'Pending',
+      status: 'Synthetic pending',
     }
 
     if (editingId) {
       setNominees((prev) =>
-        prev.map((n) => (n.id === editingId ? { ...n, ...nomineeData, status: 'Pending' } : n)),
+        prev.map((n) => (n.id === editingId ? { ...n, ...nomineeData, status: 'Synthetic pending' } : n)),
       )
       setEditingId(null)
     } else {
@@ -113,7 +114,7 @@ export default function Nominee() {
     }
 
     setForm(EMPTY_FORM)
-    alert('Nominee updated successfully. Awaiting EPFO verification')
+    alert('Synthetic nominee example updated. No real submission was made.')
   }
 
   const handleEdit = (nominee) => {
@@ -154,34 +155,40 @@ export default function Nominee() {
             >
               ← Back to Dashboard
             </button>
-            <h2 className="text-2xl font-semibold text-gray-800">Nominee Details</h2>
-            <p className="mt-1 text-sm text-gray-600">Manage your EPF nominee information</p>
+            <h2 className="text-2xl font-semibold text-gray-800">Nominee Details (Demo)</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Manage synthetic nominee information for this demonstration.
+            </p>
           </div>
 
           {primaryNominee && (
             <section className="mb-6 rounded border border-gray-200 bg-white p-5 shadow-sm">
               <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
-                Current Nominee
+                Current synthetic nominee example
               </h3>
               <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">Name</dt>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Synthetic name
+                  </dt>
                   <dd className="mt-1 font-medium text-gray-800">{primaryNominee.name}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Relationship
+                    Synthetic relationship
                   </dt>
                   <dd className="mt-1 font-medium text-gray-800">{primaryNominee.relationship}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Allocation
+                    Synthetic allocation
                   </dt>
                   <dd className="mt-1 font-medium text-gray-800">{primaryNominee.percentage}%</dd>
                 </div>
                 <div>
-                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">DOB</dt>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                    Synthetic DOB
+                  </dt>
                   <dd className="mt-1 font-medium text-gray-800">{primaryNominee.dob}</dd>
                 </div>
               </dl>
@@ -191,12 +198,12 @@ export default function Nominee() {
           <div className="grid gap-6 lg:grid-cols-2">
             <section className="rounded border border-gray-200 bg-white p-5 shadow-sm">
               <h3 className="mb-4 font-semibold text-gray-800">
-                {editingId ? 'Update Nominee' : 'Add / Update Nominee'}
+                {editingId ? 'Update synthetic nominee' : 'Add / update synthetic nominee'}
               </h3>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="name" className="mb-1 block text-sm font-medium text-gray-700">
-                    Nominee Name
+                    Synthetic nominee name
                   </label>
                   <input
                     id="name"
@@ -214,7 +221,7 @@ export default function Nominee() {
                     htmlFor="relationship"
                     className="mb-1 block text-sm font-medium text-gray-700"
                   >
-                    Relationship
+                    Synthetic relationship
                   </label>
                   <select
                     id="relationship"
@@ -236,7 +243,7 @@ export default function Nominee() {
                     htmlFor="percentage"
                     className="mb-1 block text-sm font-medium text-gray-700"
                   >
-                    Percentage Allocation
+                    Synthetic percentage allocation
                   </label>
                   <input
                     id="percentage"
@@ -253,7 +260,7 @@ export default function Nominee() {
 
                 <div>
                   <label htmlFor="dob" className="mb-1 block text-sm font-medium text-gray-700">
-                    Date of Birth
+                    Synthetic date of birth
                   </label>
                   <input
                     id="dob"
@@ -268,7 +275,7 @@ export default function Nominee() {
 
                 <div>
                   <label htmlFor="address" className="mb-1 block text-sm font-medium text-gray-700">
-                    Address
+                    Synthetic address
                   </label>
                   <textarea
                     id="address"
@@ -286,7 +293,7 @@ export default function Nominee() {
                     type="submit"
                     className="rounded bg-[#1a3a6b] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#143055]"
                   >
-                    Submit
+                    Save demo record
                   </button>
                   {editingId && (
                     <button
@@ -306,17 +313,20 @@ export default function Nominee() {
 
             <section className="rounded border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-200 px-5 py-4">
-                <h3 className="font-semibold text-gray-800">Current Nominees</h3>
+                <h3 className="font-semibold text-gray-800">Synthetic nominee examples</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Names, dates, addresses, allocations, and statuses are synthetic demo data.
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                      <th className="px-5 py-3 font-medium">Name</th>
-                      <th className="px-5 py-3 font-medium">Relationship</th>
-                      <th className="px-5 py-3 font-medium">%</th>
-                      <th className="px-5 py-3 font-medium">DOB</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
+                      <th className="px-5 py-3 font-medium">Synthetic name</th>
+                      <th className="px-5 py-3 font-medium">Synthetic relationship</th>
+                      <th className="px-5 py-3 font-medium">Synthetic %</th>
+                      <th className="px-5 py-3 font-medium">Synthetic DOB</th>
+                      <th className="px-5 py-3 font-medium">Synthetic status</th>
                       <th className="px-5 py-3 font-medium">Actions</th>
                     </tr>
                   </thead>
@@ -367,9 +377,7 @@ export default function Nominee() {
         </main>
       </div>
 
-      <footer className="border-t border-gray-200 bg-white py-3 text-center text-xs text-gray-500">
-        © Employees&apos; Provident Fund Organisation, Government of India
-      </footer>
+      <PrototypeFooter />
     </div>
   )
 }

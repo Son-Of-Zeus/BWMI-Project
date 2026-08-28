@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import DashboardHeader from '../components/DashboardHeader'
+import PrototypeFooter from '../components/PrototypeFooter'
 import Sidebar from '../components/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 
@@ -22,14 +23,14 @@ const CONTRIBUTION_HISTORY = MONTHS.map((month, index) => ({
   month,
   year: 2023,
   amount: index < 10 ? 10417 : 10416,
-  status: index < 10 ? 'Completed' : 'Pending',
+  status: index < 10 ? 'Synthetic completed' : 'Synthetic pending',
 }))
 
 const LAST_TRANSACTIONS = CONTRIBUTION_HISTORY.slice(-6)
   .reverse()
   .map((entry) => ({
     date: `${entry.month.slice(0, 3)} ${entry.year}`,
-    description: 'Monthly EPF Contribution',
+    description: 'Monthly provident-fund contribution (synthetic example)',
     amount: entry.amount,
     status: entry.status,
   }))
@@ -43,7 +44,7 @@ function formatCurrency(amount) {
 }
 
 function StatusBadge({ status }) {
-  const isCompleted = status === 'Completed'
+  const isCompleted = status === 'Synthetic completed'
   return (
     <span
       className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -68,7 +69,7 @@ export default function AccountBalance() {
   }
 
   const handleDownload = () => {
-    alert('Statement Downloaded as PDF')
+    alert('Synthetic statement downloaded as PDF')
   }
 
   return (
@@ -96,24 +97,26 @@ export default function AccountBalance() {
               >
                 ← Back to Dashboard
               </button>
-              <h2 className="text-2xl font-semibold text-gray-800">Account Balance</h2>
-              <p className="mt-1 text-sm text-gray-600">View your EPF account snapshot and contribution history</p>
+              <h2 className="text-2xl font-semibold text-gray-800">Account Balance (Demo)</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                View a synthetic provident-fund account snapshot and contribution history.
+              </p>
             </div>
             <button
               type="button"
               onClick={handleDownload}
               className="rounded bg-[#1a3a6b] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#143055]"
             >
-              Download Statement
+              Download synthetic statement
             </button>
           </div>
 
           <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'Current Balance', value: member.balance },
-              { label: 'Total Contribution', value: member.contribution },
-              { label: 'Employee Contribution', value: employeeContribution },
-              { label: 'Employer Contribution', value: employerContribution },
+              { label: 'Synthetic current balance', value: member.balance },
+              { label: 'Synthetic total contribution', value: member.contribution },
+              { label: 'Synthetic employee contribution', value: employeeContribution },
+              { label: 'Synthetic employer contribution', value: employerContribution },
             ].map((item) => (
               <div
                 key={item.label}
@@ -131,7 +134,12 @@ export default function AccountBalance() {
 
           <section className="mb-8 rounded border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 px-5 py-4">
-              <h3 className="font-semibold text-gray-800">Contribution History (Jan 2023 – Dec 2023)</h3>
+              <h3 className="font-semibold text-gray-800">
+                Synthetic contribution history (Jan 2023 – Dec 2023)
+              </h3>
+              <p className="mt-1 text-xs text-gray-500">
+                Every amount and status in this table is synthetic demo data.
+              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
@@ -139,8 +147,8 @@ export default function AccountBalance() {
                   <tr>
                     <th className="px-5 py-3 font-medium">Month</th>
                     <th className="px-5 py-3 font-medium">Year</th>
-                    <th className="px-5 py-3 font-medium">Amount</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Synthetic amount</th>
+                    <th className="px-5 py-3 font-medium">Synthetic status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -163,16 +171,19 @@ export default function AccountBalance() {
 
           <section className="rounded border border-gray-200 bg-white shadow-sm">
             <div className="border-b border-gray-200 px-5 py-4">
-              <h3 className="font-semibold text-gray-800">Last 6 Transactions</h3>
+              <h3 className="font-semibold text-gray-800">Synthetic recent transactions</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                These transaction examples are not connected to a real account.
+              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-5 py-3 font-medium">Date</th>
-                    <th className="px-5 py-3 font-medium">Description</th>
-                    <th className="px-5 py-3 font-medium">Amount</th>
-                    <th className="px-5 py-3 font-medium">Status</th>
+                    <th className="px-5 py-3 font-medium">Synthetic description</th>
+                    <th className="px-5 py-3 font-medium">Synthetic amount</th>
+                    <th className="px-5 py-3 font-medium">Synthetic status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -195,9 +206,7 @@ export default function AccountBalance() {
         </main>
       </div>
 
-      <footer className="border-t border-gray-200 bg-white py-3 text-center text-xs text-gray-500">
-        © Employees&apos; Provident Fund Organisation, Government of India
-      </footer>
+      <PrototypeFooter />
     </div>
   )
 }

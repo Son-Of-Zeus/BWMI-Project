@@ -1,26 +1,27 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import DashboardHeader from '../components/DashboardHeader'
+import PrototypeFooter from '../components/PrototypeFooter'
 import Sidebar from '../components/Sidebar'
 import { useAuth } from '../hooks/useAuth'
 
 const WITHDRAWAL_OPTIONS = [
   {
     id: 'partial',
-    title: 'Partial Withdrawal',
-    description: 'Withdraw a portion of your EPF balance for eligible purposes.',
+    title: 'Partial withdrawal (demo)',
+    description: 'Explore a synthetic partial-withdrawal workflow for eligible demo purposes.',
     availableAmount: 225000,
   },
   {
     id: 'full',
-    title: 'Full Withdrawal (Post-Superannuation)',
-    description: 'Complete withdrawal after retirement or superannuation.',
+    title: 'Full withdrawal (demo)',
+    description: 'Explore a synthetic full-withdrawal workflow for this demo.',
     availableAmount: 450000,
   },
   {
     id: 'advance',
-    title: 'Advance Against EPF',
-    description: 'Short-term advance against your EPF corpus for urgent needs.',
+    title: 'Advance request (demo)',
+    description: 'Explore a synthetic advance-request workflow for urgent demo needs.',
     availableAmount: 100000,
   },
 ]
@@ -28,34 +29,34 @@ const WITHDRAWAL_OPTIONS = [
 const REASONS = ['Medical', 'Education', 'Home Purchase', 'Emergency']
 
 const BANK_DETAILS = {
-  account: 'State Bank of India — Account ending 1234',
-  ifsc: 'SBIN0001234',
+  account: 'Synthetic demo bank — account ending 0000',
+  ifsc: 'DEMO0000000',
 }
 
 const SAMPLE_REQUESTS = [
   {
-    id: 'WD2024001189',
-    type: 'Partial Withdrawal',
+    id: 'DEMO-WD-001',
+    type: 'Partial withdrawal (demo)',
     amount: 50000,
     reason: 'Medical',
     date: '12/08/2024',
-    status: 'Approved',
+    status: 'Synthetic approved example',
   },
   {
-    id: 'WD2024001201',
-    type: 'Advance Against EPF',
+    id: 'DEMO-WD-002',
+    type: 'Advance request (demo)',
     amount: 75000,
     reason: 'Emergency',
     date: '05/09/2024',
-    status: 'Pending',
+    status: 'Synthetic pending example',
   },
   {
-    id: 'WD2024001195',
-    type: 'Partial Withdrawal',
+    id: 'DEMO-WD-003',
+    type: 'Partial withdrawal (demo)',
     amount: 200000,
     reason: 'Home Purchase',
     date: '22/08/2024',
-    status: 'Rejected',
+    status: 'Synthetic rejected example',
   },
 ]
 
@@ -75,9 +76,9 @@ function formatCurrency(amount) {
 
 function StatusBadge({ status }) {
   const styles = {
-    Approved: 'bg-green-100 text-green-800',
-    Pending: 'bg-yellow-100 text-yellow-800',
-    Rejected: 'bg-red-100 text-red-800',
+    'Synthetic approved example': 'bg-blue-100 text-blue-800',
+    'Synthetic pending example': 'bg-yellow-100 text-yellow-800',
+    'Synthetic rejected example': 'bg-gray-100 text-gray-800',
   }
   return (
     <span
@@ -145,12 +146,12 @@ export default function Withdrawal() {
       return
     }
     if (amount > maxAmount) {
-      setAmountError(`Amount cannot exceed ${formatCurrency(maxAmount)}.`)
+      setAmountError(`Synthetic amount cannot exceed ${formatCurrency(maxAmount)}.`)
       return
     }
 
-    const requestId = 'WD2024001234'
-    alert(`Request submitted with ID: ${requestId}`)
+    const requestId = 'DEMO-WD-004'
+    alert(`Synthetic demo request created with ID: ${requestId}`)
 
     setRequests((prev) => [
       {
@@ -159,7 +160,7 @@ export default function Withdrawal() {
         amount,
         reason: form.reason,
         date: new Date().toLocaleDateString('en-GB'),
-        status: 'Pending',
+        status: 'Synthetic pending example',
       },
       ...prev,
     ])
@@ -184,8 +185,11 @@ export default function Withdrawal() {
             >
               ← Back to Dashboard
             </button>
-            <h2 className="text-2xl font-semibold text-gray-800">Withdrawal Request</h2>
-            <p className="mt-1 text-sm text-gray-600">Submit and track your EPF withdrawal requests</p>
+            <h2 className="text-2xl font-semibold text-gray-800">Withdrawal Request (Demo)</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Explore synthetic withdrawal and claim-request examples. Nothing is submitted to a
+              real service.
+            </p>
           </div>
 
           <section className="mb-8 grid gap-4 md:grid-cols-3">
@@ -205,7 +209,7 @@ export default function Withdrawal() {
                   <h3 className="font-semibold text-gray-800">{option.title}</h3>
                   <p className="mt-2 text-sm text-gray-600">{option.description}</p>
                   <p className="mt-4 text-xs font-medium uppercase tracking-wide text-gray-500">
-                    Available Amount
+                    Synthetic available amount
                   </p>
                   <p className="mt-1 text-lg font-semibold text-[#1a3a6b]">
                     {formatCurrency(option.availableAmount)}
@@ -217,11 +221,14 @@ export default function Withdrawal() {
 
           <div className="grid gap-6 lg:grid-cols-2">
             <section className="rounded border border-gray-200 bg-white p-5 shadow-sm">
-              <h3 className="mb-4 font-semibold text-gray-800">New Withdrawal Request</h3>
+              <h3 className="mb-1 font-semibold text-gray-800">New synthetic claim example</h3>
+              <p className="mb-4 text-xs text-gray-500">
+                This form only creates an in-browser demo record.
+              </p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label htmlFor="type" className="mb-1 block text-sm font-medium text-gray-700">
-                    Withdrawal Type
+                    Synthetic withdrawal type
                   </label>
                   <select
                     id="type"
@@ -240,7 +247,7 @@ export default function Withdrawal() {
 
                 <div>
                   <label htmlFor="amount" className="mb-1 block text-sm font-medium text-gray-700">
-                    Amount
+                    Synthetic claim amount
                   </label>
                   <input
                     id="amount"
@@ -266,7 +273,7 @@ export default function Withdrawal() {
 
                 <div>
                   <label htmlFor="reason" className="mb-1 block text-sm font-medium text-gray-700">
-                    Reason
+                    Synthetic reason
                   </label>
                   <select
                     id="reason"
@@ -285,7 +292,7 @@ export default function Withdrawal() {
 
                 <div>
                   <label htmlFor="bank" className="mb-1 block text-sm font-medium text-gray-700">
-                    Bank Account
+                    Synthetic demo bank account
                   </label>
                   <input
                     id="bank"
@@ -297,7 +304,7 @@ export default function Withdrawal() {
                 </div>
 
                 <div>
-                  <p className="mb-1 text-sm font-medium text-gray-700">IFSC Code</p>
+                  <p className="mb-1 text-sm font-medium text-gray-700">Synthetic demo IFSC code</p>
                   <p className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-medium text-gray-800">
                     {BANK_DETAILS.ifsc}
                   </p>
@@ -307,25 +314,28 @@ export default function Withdrawal() {
                   type="submit"
                   className="w-full rounded bg-[#1a3a6b] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#143055]"
                 >
-                  Submit Request
+                  Create demo record
                 </button>
               </form>
             </section>
 
             <section className="rounded border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-200 px-5 py-4">
-                <h3 className="font-semibold text-gray-800">Recent Withdrawal Requests</h3>
+                <h3 className="font-semibold text-gray-800">Synthetic withdrawal / claim examples</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  Request IDs, statuses, dates, and amounts are synthetic demo data.
+                </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                     <tr>
-                      <th className="px-5 py-3 font-medium">Request ID</th>
-                      <th className="px-5 py-3 font-medium">Type</th>
-                      <th className="px-5 py-3 font-medium">Amount</th>
-                      <th className="px-5 py-3 font-medium">Reason</th>
-                      <th className="px-5 py-3 font-medium">Date</th>
-                      <th className="px-5 py-3 font-medium">Status</th>
+                      <th className="px-5 py-3 font-medium">Synthetic request ID</th>
+                      <th className="px-5 py-3 font-medium">Synthetic type</th>
+                      <th className="px-5 py-3 font-medium">Synthetic amount</th>
+                      <th className="px-5 py-3 font-medium">Synthetic reason</th>
+                      <th className="px-5 py-3 font-medium">Synthetic date</th>
+                      <th className="px-5 py-3 font-medium">Synthetic status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -349,9 +359,7 @@ export default function Withdrawal() {
         </main>
       </div>
 
-      <footer className="border-t border-gray-200 bg-white py-3 text-center text-xs text-gray-500">
-        © Employees&apos; Provident Fund Organisation, Government of India
-      </footer>
+      <PrototypeFooter />
     </div>
   )
 }

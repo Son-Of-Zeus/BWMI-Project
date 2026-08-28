@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
+import PrototypeFooter from '../components/PrototypeFooter'
+import { DEMO_CREDENTIALS } from '../context/AuthContext'
 import { useAuth } from '../hooks/useAuth'
 
 export default function Login() {
@@ -33,14 +35,14 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
-      <Header title="Unified Member Portal" />
+      <Header title="Provident Fund Service Demo" />
 
       <main className="flex flex-1 items-start justify-center px-4 py-10">
         <div className="w-full max-w-md rounded border border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-200 bg-gray-50 px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-800">Member Login</h2>
+            <h2 className="text-lg font-semibold text-gray-800">Demo Login</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Sign in with your Universal Account Number (UAN)
+              Use the synthetic credentials below to enter the demonstration.
             </p>
           </div>
 
@@ -62,8 +64,12 @@ export default function Login() {
 
             <div>
               <label htmlFor="uan" className="mb-1 block text-sm font-medium text-gray-700">
-                UAN (Universal Account Number)
+                UAN (demo account)
               </label>
+              <p id="uan-help" className="mb-1 text-xs text-blue-800">
+                <span className="font-semibold">Demo UAN:</span>{' '}
+                <code>{DEMO_CREDENTIALS.uan}</code> <span>(synthetic credential)</span>
+              </p>
               <input
                 id="uan"
                 type="text"
@@ -72,15 +78,20 @@ export default function Login() {
                 value={uan}
                 onChange={(e) => setUan(e.target.value)}
                 disabled={redirecting}
-                placeholder="Enter your 12-digit UAN"
+                aria-describedby="uan-help"
+                placeholder="Enter the demo UAN"
                 className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-[#1a3a6b] focus:ring-1 focus:ring-[#1a3a6b] disabled:bg-gray-100"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
-                Password
+                Password (demo account)
               </label>
+              <p id="password-help" className="mb-1 text-xs text-blue-800">
+                <span className="font-semibold">Demo password:</span>{' '}
+                <code>{DEMO_CREDENTIALS.password}</code> <span>(synthetic credential)</span>
+              </p>
               <input
                 id="password"
                 type="password"
@@ -88,7 +99,8 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={redirecting}
-                placeholder="Enter your password"
+                aria-describedby="password-help"
+                placeholder="Enter the demo password"
                 className="w-full rounded border border-gray-300 px-3 py-2 text-gray-900 outline-none focus:border-[#1a3a6b] focus:ring-1 focus:ring-[#1a3a6b] disabled:bg-gray-100"
               />
             </div>
@@ -103,14 +115,12 @@ export default function Login() {
           </form>
 
           <div className="border-t border-gray-200 px-6 py-4 text-xs text-gray-500">
-            This is a mock portal for demonstration purposes only.
+            Synthetic demo only. Do not enter real personal, financial, or login information.
           </div>
         </div>
       </main>
 
-      <footer className="border-t border-gray-200 bg-white py-4 text-center text-xs text-gray-500">
-        © Employees&apos; Provident Fund Organisation, Government of India
-      </footer>
+      <PrototypeFooter />
     </div>
   )
 }
